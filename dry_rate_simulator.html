@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dry Rate Simulator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: #fff; color: #1a1a1a; padding: 16px; font-size: 13px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .card { background: #f5f5f4; border-radius: 6px; padding: 8px 12px; }
+  .card .lbl { font-size: 10px; color: #888; margin-bottom: 2px; }
+  .card .val { font-size: 20px; font-weight: 600; color: #1a1a1a; }
+  .card .unit { font-size: 10px; color: #aaa; }
+
+  .sliders { margin-bottom: 12px; }
+  .ctrl { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .ctrl label { width: 160px; font-size: 11px; color: #555; flex-shrink: 0; }
+  .ctrl input[type=range] { flex: 1; height: 3px; accent-color: #1D9E75; cursor: pointer; }
+  .ctrl .readout { width: 44px; text-align: right; font-size: 11px; font-weight: 600; color: #1a1a1a; flex-shrink: 0; }
+
+  .sect { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+          color: #aaa; margin: 10px 0 5px; }
+
+  .chart-wrap { position: relative; width: 100%; height: 240px; margin-bottom: 8px; }
+  .chart-wrap2 { position: relative; width: 100%; height: 160px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 10px; color: #666; margin-top: 6px; }
+  .legend span { display: flex; align-items: center; gap: 4px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dash { width: 14px; height: 2px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div class="sect">Operating point</div>
+<div class="sliders">
+  <div class="ctrl">
+    <label>T_pv_in (°C)</label>
+    <input type="range" id="T" min="80" max="220" value="180" step="1">
+    <span class="readout" id="lT">180</span>
+  </div>
+  <div class="ctrl">
+    <label>Airflow (cfm)</label>
+    <input type="range" id="cfm" min="5" max="60" value="25" step="1">
+    <span class="readout" id="lC">25</span>
+  </div>
+</div>
+
+<div class="sect">Model parameters</div>
+<div class="sliders">
+  <div class="ctrl">
+    <label>a — moisture pickup</label>
+    <input type="range" id="a" min="0.5" max="5.0" value="2.05" step="0.05">
+    <span class="readout" id="lA">2.05</span>
+  </div>
+  <div class="ctrl">
+    <label>n — surface dryout</label>
+    <input type="range" id="n" min="0.5" max="6.0" value="2.20" step="0.1">
+    <span class="readout" id="lN">2.20</span>
+  </div>
+  <div class="ctrl">
+    <label>τ_out — food lag (hr)</label>
+    <input type="range" id="tau" min="0.1" max="1.5" value="0.55" step="0.05">
+    <span class="readout" id="lTau">0.55</span>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card"><div class="lbl">T_ss predicted</div><div class="val" id="cTss">—</div><div class="unit">°C</div></div>
+  <div class="card"><div class="lbl">Peak dry rate</div><div class="val" id="cPeak" style="color:#1D9E75">—</div><div class="unit">g/min</div></div>
+  <div class="card"><div class="lbl">Total water removed</div><div class="val" id="cTotal">—</div><div class="unit">kg</div></div>
+  <div class="card"><div class="lbl">MC at t = 8hr</div><div class="val" id="cMC">—</div><div class="unit">%</div></div>
+</div>
+
+<div class="chart-wrap">
+  <canvas id="drChart" role="img" aria-label="Simulated dry rate over time">Dry rate simulation.</canvas>
+</div>
+<div class="chart-wrap2">
+  <canvas id="tChart" role="img" aria-label="T_pv_out over time">T_pv_out simulation.</canvas>
+</div>
+
+<div class="legend">
+  <span><span class="dot" style="background:#1D9E75"></span>Model</span>
+  <span><span class="dash" style="background:#2196F3;border-top:2px dashed #2196F3"></span>0421 — 130°C / 37cfm</span>
+  <span><span class="dash" style="background:#FF9800;border-top:2px dashed #FF9800"></span>0422 — 180°C / 23cfm</span>
+  <span><span class="dash" style="background:#E91E63;border-top:2px dashed #E91E63"></span>0427 — 180°C / 22cfm (HGS)</span>
+</div>
+
+<script>
+// ── Physics constants ─────────────────────────────────────────────────────────
+const CP=1006, RHO=101325/(287.05*296.15), MR_IN=12.0, T_IN=23.0;
+const TOTAL_FOOD=44.0, INIT_MC_KG=36.04;
+const DRY_MATTER=TOTAL_FOOD-INIT_MC_KG, MC_0=INIT_MC_KG/TOTAL_FOOD*100;
+const T_START=-0.70, T_ROOM=23.0;
+const TAU_IN_INTERP={x:[127,179,180],y:[0.278,0.594,0.296]};
+
+function psat(T){
+  const P=T<=99
+    ?Math.pow(10,8.07131-1730.63/(233.426+T))
+    :Math.pow(10,8.14019-1810.94/(244.485+T));
+  return P*0.133322;
+}
+const Psat_in=psat(T_IN);
+
+function interp(x,xs,ys){
+  if(x<=xs[0])return ys[0];
+  if(x>=xs[xs.length-1])return ys[ys.length-1];
+  for(let i=0;i<xs.length-1;i++){
+    if(x>=xs[i]&&x<=xs[i+1]){
+      const t=(x-xs[i])/(xs[i+1]-xs[i]);
+      return ys[i]+t*(ys[i+1]-ys[i]);
+    }
+  }
+  return ys[ys.length-1];
+}
+
+function simulate(Tpv, cfm, a, n, tau_out){
+  const T_ss=0.3715*Tpv-0.0207*cfm+34.015;
+  const tau_in=Math.max(interp(Tpv,TAU_IN_INTERP.x,TAU_IN_INTERP.y),0.05);
+  const mdot_dry=cfm*0.000471947*RHO/(1+MR_IN/1000);
+
+  const dt=1/60, t_begin=T_START;
+  const N=Math.floor((12-t_begin)/dt);
+  const times=[],drs=[],touts=[];
+  let water=INIT_MC_KG;
+  let peak_dr=0;
+
+  for(let i=0;i<=N;i++){
+    const t=t_begin+i*dt;
+    const MC=100*water/(water+DRY_MATTER);
+    if(MC<3)break;
+    const t_rel=Math.max(t-T_START,0);
+    const T_out=T_ss+(T_ROOM-T_ss)*Math.exp(-t_rel/tau_out);
+    const mc_ratio=MC/MC_0;
+    const dPs=Math.max(psat(T_out)-Psat_in,0);
+    const MR_out=MR_IN+a*Math.pow(mc_ratio,n)*dPs;
+    const dr=Math.max(mdot_dry*1000*(MR_out-MR_IN)*60/1000,0);
+    times.push(t); drs.push(dr); touts.push(T_out);
+    if(dr>peak_dr)peak_dr=dr;
+    water-=dr/1000*dt*60;
+    water=Math.max(water,0);
+  }
+
+  // Shift so dr=10 is t=0
+  let shift=0;
+  for(let i=0;i<drs.length;i++){if(drs[i]>=10){shift=times[i];break;}}
+  const ts=times.map(t=>+(t-shift).toFixed(3));
+  const water_removed=INIT_MC_KG-water;
+  const mc_at_8=(() => {
+    let w2=INIT_MC_KG;
+    for(let i=0;i<times.length;i++){
+      if(ts[i]>8)return +(100*w2/(w2+DRY_MATTER)).toFixed(1);
+      w2-=drs[i]/1000*dt*60; w2=Math.max(w2,0);
+    }
+    return (100*w2/(w2+DRY_MATTER)).toFixed(1);
+  })();
+
+  return{ts,drs,touts,T_ss,peak_dr,water_removed,mc_at_8};
+}
+
+// ── Actual run data (sampled, smoothed) ───────────────────────────────────────
+const RUNS=[
+  {color:'#2196F3',dr:[[0,11],[0.25,43],[0.5,59],[0.75,69],[1,81],[1.5,109],[2,111],[2.5,121],[3,108],[4,90],[5,70],[6,48],[7,28],[8,12]],
+   tout:[[0,62],[0.5,75],[1,83],[1.5,86],[2,87],[3,86],[4,85],[5,83]]},
+  {color:'#FF9800',dr:[[0,11],[0.25,52],[0.5,77],[0.75,97],[1,116],[1.5,132],[2,109],[3,86],[4,68],[5,50],[6,34],[7,19],[8,8]],
+   tout:[[0,63],[0.5,98],[1,104],[1.5,106],[2,104],[3,103],[4,102],[5,100]]},
+  {color:'#E91E63',dr:[[0,10],[0.25,8],[0.5,49],[0.75,91],[1,114],[1.5,129],[2,120],[3,98],[4,78],[5,57],[6,38],[7,20]],
+   tout:[[0,81],[0.5,97],[1,99],[1.5,100],[2,100],[3,99],[4,98]]}
+];
+
+// ── Build charts ──────────────────────────────────────────────────────────────
+const init=simulate(180,25,2.05,2.20,0.55);
+
+function makeDataset(r,init){
+  return{
+    label:'Model',data:r.ts.map((t,i)=>({x:t,y:+r.drs[i].toFixed(1)})),
+    borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.07)',
+    borderWidth:2,pointRadius:0,tension:0.3,fill:true,showLine:true
+  };
+}
+
+function runDrDatasets(){
+  return RUNS.map(r=>({
+    data:r.dr.map(([x,y])=>({x,y})),
+    borderColor:r.color,borderDash:[5,3],borderWidth:1.5,
+    pointRadius:0,tension:0.3,showLine:true,fill:false
+  }));
+}
+function runToutDatasets(){
+  return RUNS.map(r=>({
+    data:r.tout.map(([x,y])=>({x,y})),
+    borderColor:r.color,borderDash:[5,3],borderWidth:1.5,
+    pointRadius:0,tension:0.3,showLine:true,fill:false
+  }));
+}
+
+const commonOpts=(yLabel)=>({
+  responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{display:false},
+    tooltip:{callbacks:{label:c=>`${c.parsed.y.toFixed(0)} ${yLabel}`}}},
+  scales:{
+    x:{type:'linear',title:{display:true,text:'Hours (aligned to dr = 10 g/min)',font:{size:10}},
+       min:-0.5,max:10,
+       ticks:{callback:v=>v%2===0?v:''}},
+    y:{title:{display:true,text:yLabel,font:{size:10}},min:0}
+  }
+});
+
+const drChart=new Chart(document.getElementById('drChart'),{
+  type:'scatter',
+  data:{datasets:[makeDataset(init),...runDrDatasets()]},
+  options:commonOpts('g/min')
+});
+const tChart=new Chart(document.getElementById('tChart'),{
+  type:'scatter',
+  data:{datasets:[
+    {data:init.ts.map((t,i)=>({x:t,y:+init.touts[i].toFixed(1)})),
+     borderColor:'#1D9E75',borderWidth:2,pointRadius:0,tension:0.3,showLine:true,fill:false},
+    ...runToutDatasets()
+  ]},
+  options:commonOpts('°C')
+});
+
+function updateCards(r){
+  document.getElementById('cTss').textContent=r.T_ss.toFixed(0);
+  document.getElementById('cPeak').textContent=Math.round(r.peak_dr);
+  document.getElementById('cTotal').textContent=r.water_removed.toFixed(1);
+  document.getElementById('cMC').textContent=r.mc_at_8+'%';
+}
+updateCards(init);
+
+function go(){
+  const Tv=+document.getElementById('T').value;
+  const cv=+document.getElementById('cfm').value;
+  const av=+document.getElementById('a').value;
+  const nv=+document.getElementById('n').value;
+  const tv=+document.getElementById('tau').value;
+  document.getElementById('lT').textContent=Tv;
+  document.getElementById('lC').textContent=cv;
+  document.getElementById('lA').textContent=av.toFixed(2);
+  document.getElementById('lN').textContent=nv.toFixed(1);
+  document.getElementById('lTau').textContent=tv.toFixed(2);
+
+  const r=simulate(Tv,cv,av,nv,tv);
+  updateCards(r);
+
+  drChart.data.datasets[0]=makeDataset(r);
+  drChart.update('none');
+
+  tChart.data.datasets[0]={
+    data:r.ts.map((t,i)=>({x:t,y:+r.touts[i].toFixed(1)})),
+    borderColor:'#1D9E75',borderWidth:2,pointRadius:0,tension:0.3,showLine:true,fill:false
+  };
+  tChart.update('none');
+}
+
+['T','cfm','a','n','tau'].forEach(id=>
+  document.getElementById(id).addEventListener('input',go));
+</script>
+</body>
+</html>
