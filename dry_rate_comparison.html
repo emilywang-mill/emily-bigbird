@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dry Rate Comparison</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Courier New', monospace;
+    background: #0e0f11;
+    color: #c8cad0;
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  h1 {
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #4a4d58;
+    margin-bottom: 20px;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .run-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex: 1;
+  }
+
+  .pill {
+    padding: 5px 12px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: transparent;
+    opacity: 0.3;
+  }
+  .pill.on { opacity: 1; }
+  .pill:hover { opacity: 0.8; }
+
+  .right-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .btn-group {
+    display: flex;
+    border: 1px solid #2a2d36;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .btn-group button {
+    padding: 5px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    background: transparent;
+    color: #4a4d58;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-group button.active {
+    background: #1e2028;
+    color: #c8cad0;
+  }
+  .btn-group button:hover:not(.active) { background: #161820; }
+
+  .slider-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: #4a4d58;
+    letter-spacing: 0.06em;
+  }
+  .slider-wrap input[type=range] {
+    width: 100px;
+    accent-color: #5169D1;
+    cursor: pointer;
+  }
+  .slider-wrap span {
+    color: #c8cad0;
+    min-width: 28px;
+    text-align: right;
+  }
+
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 420px;
+    background: #0a0b0d;
+    border: 1px solid #1a1c22;
+    border-radius: 4px;
+    padding: 16px;
+  }
+
+  .loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: #2a2d36;
+    text-transform: uppercase;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #6a6d78;
+    letter-spacing: 0.04em;
+  }
+  .legend-item .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .legend-item .peak {
+    color: #3a3d48;
+    margin-left: 2px;
+  }
+
+  .events-toggle {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    background: transparent;
+    color: #4a4d58;
+    border: 1px solid #2a2d36;
+    border-radius: 3px;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .events-toggle.on { color: #c8cad0; border-color: #4a4d58; }
+</style>
+</head>
+<body>
+
+<h1>Dry rate comparison — aligned to oil @ 185°C</h1>
+
+<div class="controls">
+  <div class="run-pills" id="pills"></div>
+  <div class="right-controls">
+    <button class="events-toggle" id="eventsToggle" onclick="toggleEvents()">events</button>
+    <div class="btn-group">
+      <button id="btnRaw" onclick="setView('raw')">raw</button>
+      <button id="btnSmooth" class="active" onclick="setView('smooth')">smoothed</button>
+      <button id="btnBoth" onclick="setView('both')">both</button>
+    </div>
+    <div class="slider-wrap">
+      <span>avg</span>
+      <input type="range" id="winSlider" min="1" max="60" value="10" step="1" oninput="onSlider(this.value)">
+      <span id="winVal">10 min</span>
+    </div>
+  </div>
+</div>
+
+<div class="chart-wrap">
+  <div class="loading" id="loading">Loading data…</div>
+  <canvas id="chart" role="img" aria-label="Dry rate comparison chart aligned to oil reaching 185°C"></canvas>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<script>
+const BASE = 'https://raw.githubusercontent.com/emilywang-mill/emily-bigbird/main/data/';
+
+const RUNS = {
+  '0302': { label: '0302 — 180°C / 35%',                color: '#D3EE59' },
+  '0407': { label: '0407 — water',                      color: '#E47474' },
+  '0409': { label: '0409 — 180°C / 35%',                color: '#E0A434' },
+  '0415': { label: '0415',                               color: '#9FE1CB' },
+  '0416': { label: '0416 — varying',                    color: '#4CBB17' },
+  '0420': { label: '0420 — 180°C / 35% PWM',            color: '#52D8CD' },
+  '0421': { label: '0421 — 130°C / 70% PWM',            color: '#21B1F3' },
+  '0422': { label: '0422 — control (24 RPM)',            color: '#25D125' },
+  '0423': { label: '0423 — grind patterns',              color: '#7840AC' },
+  '0427': { label: '0427 — high grind speed (34 RPM)',  color: '#EC3535' },
+  '0428': { label: '0428 — 190°C / 15%',                color: '#8951D1' },
+  '0504': { label: '0504',                               color: '#5169D1' },
+  '0505': { label: '0505 — asymmetric',                  color: '#D1518D' },
+};
+
+const EVENTS = {
+  '0423': [
+    { ts: '2026-04-23 11:48:00', label: '24, 90/30/270' },
+    { ts: '2026-04-23 12:16:00', label: '24, 30/30/330' },
+    { ts: '2026-04-23 12:45:00', label: '24, 30/5/330' },
+    { ts: '2026-04-23 13:20:00', label: '30, 30/5/330' },
+    { ts: '2026-04-23 13:51:00', label: '30, 270/5/90' },
+    { ts: '2026-04-23 14:25:00', label: '24, 90/30/270' },
+    { ts: '2026-04-23 15:11:00', label: '24, 1/1/1000' },
+  ],
+  '0428': [
+    { ts: '2026-04-28 09:52:00', label: '200°C 15% — trip' },
+    { ts: '2026-04-28 10:33:00', label: '180°C 20% — trip' },
+    { ts: '2026-04-28 11:42:00', label: '180°C 25% — trip' },
+    { ts: '2026-04-28 11:48:00', label: '180°C 80% PWM' },
+  ],
+  '0416': [
+    { ts: '2026-04-16 10:35:00', label: '120°C 70%' },
+    { ts: '2026-04-16 11:05:00', label: '120°C 30%' },
+    { ts: '2026-04-16 11:46:00', label: '150°C 30%' },
+    { ts: '2026-04-16 12:33:00', label: '130°C 70%' },
+    { ts: '2026-04-16 14:40:00', label: 'CD 185→120°C' },
+    { ts: '2026-04-16 16:11:00', label: 'CD 120→60°C' },
+  ],
+};
+
+const OIL_ALIGN_TEMP = 185.0;
+const DR_CLIP_MAX = 400;
+const DR_CLIP_MIN = -20;
+
+let datasets = {};
+let activeRuns = new Set(['0422', '0423', '0427']);
+let winMin = 10;
+let viewMode = 'smooth';
+let showEvents = false;
+let chart = null;
+
+function rolling(arr, win) {
+  const half = Math.floor(win / 2);
+  return arr.map((_, i) => {
+    const lo = Math.max(0, i - half);
+    const hi = Math.min(arr.length - 1, i + half);
+    let sum = 0, count = 0;
+    for (let j = lo; j <= hi; j++) { sum += arr[j]; count++; }
+    return sum / count;
+  });
+}
+
+function parseTs(s) {
+  return new Date(s.replace(' ', 'T')).getTime();
+}
+
+function processCSV(name, rows) {
+  rows = rows.filter(r => r.elapsed_hr !== undefined && r.elapsed_hr !== '');
+  rows.sort((a, b) => +a.elapsed_hr - +b.elapsed_hr);
+
+  const oilCol = rows[0] && Object.keys(rows[0]).find(k => k.includes('jacket_oil_temperature'));
+  const drCol  = rows[0] && Object.keys(rows[0]).find(k => k.includes('dry_rate_g_min'));
+  const tsCol  = rows[0] && Object.keys(rows[0]).find(k => k === 'time');
+
+  const oilTemps = rows.map(r => parseFloat(r[oilCol] ?? 0) || 0);
+  const drRaw    = rows.map(r => Math.min(DR_CLIP_MAX, Math.max(DR_CLIP_MIN, parseFloat(r[drCol] ?? 0) || 0)));
+  const elapseds = rows.map(r => parseFloat(r.elapsed_hr));
+  const times    = rows.map(r => r[tsCol] ?? '');
+
+  const hitIdx = oilTemps.findIndex(t => t >= OIL_ALIGN_TEMP);
+  const tZeroElapsed = hitIdx >= 0 ? elapseds[hitIdx] : 0;
+  const tZeroTs      = hitIdx >= 0 ? parseTs(times[hitIdx]) : null;
+
+  const tHr = elapseds.map(e => e - tZeroElapsed);
+
+  return { tHr, drRaw, times, tZeroTs, oilTemps };
+}
+
+async function loadRun(name) {
+  if (datasets[name]) return datasets[name];
+  const url = BASE + name + '.csv';
+  return new Promise((resolve, reject) => {
+    Papa.parse(url, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: res => {
+        datasets[name] = processCSV(name, res.data);
+        resolve(datasets[name]);
+      },
+      error: reject,
+    });
+  });
+}
+
+function buildChartData() {
+  const chartDatasets = [];
+
+  for (const name of activeRuns) {
+    const d = datasets[name];
+    if (!d) continue;
+    const meta = RUNS[name];
+    const sm = rolling(d.drRaw, winMin);
+    const color = meta.color;
+
+    if (viewMode === 'raw' || viewMode === 'both') {
+      chartDatasets.push({
+        label: name + '_raw',
+        data: d.tHr.map((t, i) => ({ x: +t.toFixed(4), y: +d.drRaw[i].toFixed(2) })),
+        borderColor: color,
+        backgroundColor: 'transparent',
+        borderWidth: 0.8,
+        pointRadius: 0,
+        tension: 0,
+        parsing: false,
+        borderDash: viewMode === 'both' ? [2, 3] : [],
+        alpha: 0.2,
+        _runName: name,
+        _isSm: false,
+      });
+    }
+
+    if (viewMode === 'smooth' || viewMode === 'both') {
+      chartDatasets.push({
+        label: name + '_sm',
+        data: d.tHr.map((t, i) => ({ x: +t.toFixed(4), y: +sm[i].toFixed(2) })),
+        borderColor: color,
+        backgroundColor: 'transparent',
+        borderWidth: viewMode === 'both' ? 2 : 2,
+        pointRadius: 0,
+        tension: 0,
+        parsing: false,
+        _runName: name,
+        _isSm: true,
+      });
+    }
+
+    if (showEvents && EVENTS[name] && d.tZeroTs) {
+      for (let ei = 0; ei < EVENTS[name].length; ei++) {
+        const ev = EVENTS[name][ei];
+        const evThr = (parseTs(ev.ts) - d.tZeroTs) / 3600000;
+        chartDatasets.push({
+          label: name + '_ev_' + ei,
+          data: [{ x: +evThr.toFixed(4), y: -20 }, { x: +evThr.toFixed(4), y: 350 }],
+          borderColor: color,
+          backgroundColor: 'transparent',
+          borderWidth: 0.8,
+          borderDash: [4, 4],
+          pointRadius: 0,
+          tension: 0,
+          parsing: false,
+          _isEvent: true,
+          _evLabel: ev.label,
+          _evColor: color,
+        });
+      }
+    }
+  }
+
+  return chartDatasets;
+}
+
+const eventLabelPlugin = {
+  id: 'eventLabels',
+  afterDraw(chart) {
+    const { ctx, scales: { x, y } } = chart;
+    chart.data.datasets.forEach(ds => {
+      if (!ds._isEvent) return;
+      const xPx = x.getPixelForValue(ds.data[0].x);
+      ctx.save();
+      ctx.fillStyle = ds._evColor;
+      ctx.globalAlpha = 0.75;
+      ctx.font = '9px Courier New';
+      ctx.textAlign = 'left';
+      ctx.translate(xPx + 3, y.getPixelForValue(280));
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(ds._evLabel, 0, 0);
+      ctx.restore();
+    });
+  }
+};
+
+function buildChart() {
+  const canvas = document.getElementById('chart');
+  if (chart) { chart.destroy(); chart = null; }
+
+  const gridColor = 'rgba(255,255,255,0.04)';
+  const tickColor = '#3a3d48';
+
+  chart = new Chart(canvas, {
+    type: 'line',
+    data: { datasets: buildChartData() },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          filter: item => !item.dataset._isEvent,
+          callbacks: {
+            title: items => {
+              const t = items[0].parsed.x;
+              return `t = ${t.toFixed(2)} hr`;
+            },
+            label: item => {
+              if (item.dataset._isEvent) return null;
+              const name = item.dataset._runName;
+              return ` ${RUNS[name]?.label}: ${item.parsed.y.toFixed(1)} g/min`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          title: { display: true, text: 'Elapsed time since oil at 185°C  [hr]', color: tickColor, font: { family: 'Courier New', size: 11 } },
+          grid: { color: gridColor },
+          ticks: { color: tickColor, font: { family: 'Courier New', size: 10 }, maxTicksLimit: 12 },
+        },
+        y: {
+          title: { display: true, text: 'Dry rate  [g/min]', color: tickColor, font: { family: 'Courier New', size: 11 } },
+          grid: { color: gridColor },
+          ticks: { color: tickColor, font: { family: 'Courier New', size: 10 } },
+          min: -25,
+        }
+      }
+    },
+    plugins: [eventLabelPlugin],
+  });
+}
+
+function updateLegend() {
+  const el = document.getElementById('legend');
+  el.innerHTML = '';
+  for (const name of activeRuns) {
+    const d = datasets[name];
+    if (!d) continue;
+    const sm = rolling(d.drRaw, winMin);
+    const peak = Math.max(...sm).toFixed(0);
+    const meta = RUNS[name];
+    el.innerHTML += `
+      <div class="legend-item">
+        <span class="dot" style="background:${meta.color}"></span>
+        <span>${meta.label}</span>
+        <span class="peak">peak ${peak} g/min</span>
+      </div>`;
+  }
+}
+
+function rebuildChart() {
+  if (chart) {
+    chart.data.datasets = buildChartData();
+    chart.update('none');
+  } else {
+    buildChart();
+  }
+  updateLegend();
+}
+
+async function toggleRun(name) {
+  const pill = document.getElementById('pill-' + name);
+  if (activeRuns.has(name)) {
+    activeRuns.delete(name);
+    pill.classList.remove('on');
+    rebuildChart();
+  } else {
+    activeRuns.add(name);
+    if (!datasets[name]) {
+      pill.textContent = name + ' …';
+      try {
+        await loadRun(name);
+        pill.textContent = name;
+      } catch(e) {
+        pill.textContent = name + ' ✕';
+        activeRuns.delete(name);
+        pill.classList.remove('on');
+        return;
+      }
+    }
+    pill.classList.add('on');
+    rebuildChart();
+  }
+}
+
+function setView(v) {
+  viewMode = v;
+  ['Raw','Smooth','Both'].forEach(s => {
+    document.getElementById('btn' + s).classList.toggle('active', v === s.toLowerCase());
+  });
+  rebuildChart();
+}
+
+function onSlider(v) {
+  winMin = parseInt(v);
+  document.getElementById('winVal').textContent = v + ' min';
+  rebuildChart();
+}
+
+function toggleEvents() {
+  showEvents = !showEvents;
+  const btn = document.getElementById('eventsToggle');
+  btn.classList.toggle('on', showEvents);
+  rebuildChart();
+}
+
+async function init() {
+  const pillsEl = document.getElementById('pills');
+  for (const [name, meta] of Object.entries(RUNS)) {
+    const btn = document.createElement('button');
+    btn.className = 'pill' + (activeRuns.has(name) ? ' on' : '');
+    btn.id = 'pill-' + name;
+    btn.textContent = name;
+    btn.style.borderColor = meta.color;
+    btn.style.color = meta.color;
+    btn.onclick = () => toggleRun(name);
+    pillsEl.appendChild(btn);
+  }
+
+  const loading = document.getElementById('loading');
+  loading.style.display = 'flex';
+
+  const toLoad = [...activeRuns];
+  await Promise.all(toLoad.map(name => loadRun(name).catch(() => activeRuns.delete(name))));
+
+  loading.style.display = 'none';
+  buildChart();
+  updateLegend();
+}
+
+init();
+</script>
+</body>
+</html>
