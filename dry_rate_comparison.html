@@ -7,191 +7,166 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap');
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    font-family: 'Courier New', monospace;
-    background: #0e0f11;
-    color: #c8cad0;
-    min-height: 100vh;
-    padding: 24px;
+    font-family: 'Inter', ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #ffffff;
+    color: #37352f;
+    padding: 20px 24px 32px;
+    font-size: 14px;
+    line-height: 1.5;
   }
 
   h1 {
     font-size: 13px;
-    font-weight: 400;
-    letter-spacing: 0.12em;
+    font-weight: 500;
+    color: #9b9a97;
+    letter-spacing: 0.01em;
+    margin-bottom: 16px;
     text-transform: uppercase;
-    color: #4a4d58;
-    margin-bottom: 20px;
   }
 
   .controls {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 8px;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
   }
 
-  .run-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    flex: 1;
-  }
+  .run-pills { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; }
 
   .pill {
-    padding: 5px 12px;
-    border-radius: 3px;
+    padding: 3px 10px;
+    border-radius: 4px;
     border: 1px solid transparent;
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    letter-spacing: 0.06em;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: opacity 0.12s, background 0.12s;
     background: transparent;
-    opacity: 0.3;
+    opacity: 0.22;
+    line-height: 1.6;
   }
-  .pill.on { opacity: 1; }
-  .pill:hover { opacity: 0.8; }
+  .pill.on { opacity: 1; background: rgba(0,0,0,0.04); }
+  .pill:hover { opacity: 0.65; }
 
-  .right-controls {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-shrink: 0;
-  }
+  .right-controls { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 
-  .btn-group {
+  .seg {
     display: flex;
-    border: 1px solid #2a2d36;
-    border-radius: 3px;
+    border: 1px solid #e3e2e0;
+    border-radius: 6px;
     overflow: hidden;
+    background: #f7f6f3;
   }
-  .btn-group button {
-    padding: 5px 12px;
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    letter-spacing: 0.06em;
+  .seg button {
+    padding: 4px 11px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 400;
     background: transparent;
-    color: #4a4d58;
+    color: #9b9a97;
     border: none;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.12s;
+    line-height: 1.6;
   }
-  .btn-group button.active {
-    background: #1e2028;
-    color: #c8cad0;
-  }
-  .btn-group button:hover:not(.active) { background: #161820; }
+  .seg button + button { border-left: 1px solid #e3e2e0; }
+  .seg button.active { background: #ffffff; color: #37352f; font-weight: 500; }
+  .seg button:hover:not(.active) { color: #37352f; }
 
   .slider-wrap {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 11px;
-    color: #4a4d58;
-    letter-spacing: 0.06em;
+    font-size: 12px;
+    color: #9b9a97;
   }
   .slider-wrap input[type=range] {
-    width: 100px;
-    accent-color: #5169D1;
+    -webkit-appearance: none;
+    width: 90px;
+    height: 4px;
+    background: #e3e2e0;
+    border-radius: 2px;
+    outline: none;
     cursor: pointer;
   }
-  .slider-wrap span {
-    color: #c8cad0;
-    min-width: 28px;
-    text-align: right;
+  .slider-wrap input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #37352f;
+    cursor: pointer;
   }
+  .slider-wrap .val { color: #37352f; font-weight: 500; min-width: 38px; text-align: right; font-size: 12px; }
 
   .chart-wrap {
     position: relative;
     width: 100%;
-    height: 420px;
-    background: #0a0b0d;
-    border: 1px solid #1a1c22;
-    border-radius: 4px;
-    padding: 16px;
+    height: 400px;
+    background: #ffffff;
+    border: 1px solid #e3e2e0;
+    border-radius: 8px;
+    padding: 14px 14px 14px 14px;
   }
 
   .loading {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    letter-spacing: 0.1em;
-    color: #2a2d36;
-    text-transform: uppercase;
-    pointer-events: none;
-    transition: opacity 0.3s;
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: #c7c6c3; pointer-events: none; font-weight: 400;
   }
 
-  .legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 14px;
-  }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
   .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: #6a6d78;
-    letter-spacing: 0.04em;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: #6b6a67;
   }
-  .legend-item .dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .legend-item .peak {
-    color: #3a3d48;
-    margin-left: 2px;
-  }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .legend-peak { color: #c7c6c3; margin-left: 1px; }
 
-  .events-toggle {
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    letter-spacing: 0.06em;
-    background: transparent;
-    color: #4a4d58;
-    border: 1px solid #2a2d36;
-    border-radius: 3px;
-    padding: 5px 10px;
-    cursor: pointer;
-    transition: all 0.15s;
+  .ev-btn {
+    font-family: inherit; font-size: 12px; font-weight: 400;
+    background: transparent; color: #9b9a97;
+    border: 1px solid #e3e2e0; border-radius: 6px;
+    padding: 4px 10px; cursor: pointer; transition: all 0.12s;
+    line-height: 1.6;
   }
-  .events-toggle.on { color: #c8cad0; border-color: #4a4d58; }
+  .ev-btn.on { background: #f7f6f3; color: #37352f; border-color: #c7c6c3; font-weight: 500; }
+
+  .divider {
+    width: 1px; height: 18px; background: #e3e2e0; flex-shrink: 0;
+  }
 </style>
 </head>
 <body>
 
-<h1>Dry rate comparison — aligned to oil @ 185°C</h1>
+<h1>Dry rate — aligned to oil @ 185 °C</h1>
 
 <div class="controls">
   <div class="run-pills" id="pills"></div>
+  <div class="divider"></div>
   <div class="right-controls">
-    <button class="events-toggle" id="eventsToggle" onclick="toggleEvents()">events</button>
-    <div class="btn-group">
-      <button id="btnRaw" onclick="setView('raw')">raw</button>
-      <button id="btnSmooth" class="active" onclick="setView('smooth')">smoothed</button>
-      <button id="btnBoth" onclick="setView('both')">both</button>
+    <button class="ev-btn" id="evBtn" onclick="toggleEvents()">Events</button>
+    <div class="seg">
+      <button id="btnRaw"    onclick="setView('raw')">Raw</button>
+      <button id="btnSmooth" class="active" onclick="setView('smooth')">Smoothed</button>
+      <button id="btnBoth"   onclick="setView('both')">Both</button>
     </div>
     <div class="slider-wrap">
-      <span>avg</span>
+      <span>Avg</span>
       <input type="range" id="winSlider" min="1" max="60" value="10" step="1" oninput="onSlider(this.value)">
-      <span id="winVal">10 min</span>
+      <span class="val" id="winVal">10 min</span>
     </div>
   </div>
 </div>
 
 <div class="chart-wrap">
-  <div class="loading" id="loading">Loading data…</div>
-  <canvas id="chart" role="img" aria-label="Dry rate comparison chart aligned to oil reaching 185°C"></canvas>
+  <div class="loading" id="loading">Loading…</div>
+  <canvas id="chart" role="img" aria-label="Dry rate comparison across runs, aligned to oil reaching 185°C"></canvas>
 </div>
 
 <div class="legend" id="legend"></div>
@@ -200,246 +175,206 @@
 const BASE = 'https://raw.githubusercontent.com/emilywang-mill/emily-bigbird/main/data/';
 
 const RUNS = {
-  '0302': { label: '0302 — 180°C / 35%',                color: '#D3EE59' },
-  '0407': { label: '0407 — water',                      color: '#E47474' },
-  '0409': { label: '0409 — 180°C / 35%',                color: '#E0A434' },
-  '0415': { label: '0415',                               color: '#9FE1CB' },
-  '0416': { label: '0416 — varying',                    color: '#4CBB17' },
-  '0420': { label: '0420 — 180°C / 35% PWM',            color: '#52D8CD' },
-  '0421': { label: '0421 — 130°C / 70% PWM',            color: '#21B1F3' },
-  '0422': { label: '0422 — control (24 RPM)',            color: '#25D125' },
-  '0423': { label: '0423 — grind patterns',              color: '#7840AC' },
-  '0427': { label: '0427 — high grind speed (34 RPM)',  color: '#EC3535' },
-  '0428': { label: '0428 — 190°C / 15%',                color: '#8951D1' },
-  '0504': { label: '0504',                               color: '#5169D1' },
-  '0505': { label: '0505 — asymmetric',                  color: '#D1518D' },
+  '0302': { label: '0302 — 180°C / 35%',               color: '#8b5cf6' },
+  '0407': { label: '0407 — water',                      color: '#ef4444' },
+  '0409': { label: '0409 — 180°C / 35%',                color: '#f97316' },
+  '0415': { label: '0415',                               color: '#14b8a6' },
+  '0416': { label: '0416 — varying',                    color: '#22c55e' },
+  '0420': { label: '0420 — 180°C / 35% PWM',            color: '#06b6d4' },
+  '0421': { label: '0421 — 130°C / 70% PWM',            color: '#3b82f6' },
+  '0422': { label: '0422 — control (24 RPM)',            color: '#10b981' },
+  '0423': { label: '0423 — grind patterns',              color: '#a855f7' },
+  '0427': { label: '0427 — high grind (34 RPM)',         color: '#f43f5e' },
+  '0428': { label: '0428 — 190°C / 15%',                color: '#6366f1' },
+  '0504': { label: '0504',                               color: '#0ea5e9' },
+  '0505': { label: '0505 — asymmetric',                  color: '#ec4899' },
 };
 
 const EVENTS = {
   '0423': [
     { ts: '2026-04-23 11:48:00', label: '24, 90/30/270' },
     { ts: '2026-04-23 12:16:00', label: '24, 30/30/330' },
-    { ts: '2026-04-23 12:45:00', label: '24, 30/5/330' },
-    { ts: '2026-04-23 13:20:00', label: '30, 30/5/330' },
-    { ts: '2026-04-23 13:51:00', label: '30, 270/5/90' },
+    { ts: '2026-04-23 12:45:00', label: '24, 30/5/330'  },
+    { ts: '2026-04-23 13:20:00', label: '30, 30/5/330'  },
+    { ts: '2026-04-23 13:51:00', label: '30, 270/5/90'  },
     { ts: '2026-04-23 14:25:00', label: '24, 90/30/270' },
-    { ts: '2026-04-23 15:11:00', label: '24, 1/1/1000' },
+    { ts: '2026-04-23 15:11:00', label: '24, 1/1/1000'  },
   ],
   '0428': [
     { ts: '2026-04-28 09:52:00', label: '200°C 15% — trip' },
     { ts: '2026-04-28 10:33:00', label: '180°C 20% — trip' },
     { ts: '2026-04-28 11:42:00', label: '180°C 25% — trip' },
-    { ts: '2026-04-28 11:48:00', label: '180°C 80% PWM' },
+    { ts: '2026-04-28 11:48:00', label: '180°C 80% PWM'    },
   ],
   '0416': [
-    { ts: '2026-04-16 10:35:00', label: '120°C 70%' },
-    { ts: '2026-04-16 11:05:00', label: '120°C 30%' },
-    { ts: '2026-04-16 11:46:00', label: '150°C 30%' },
-    { ts: '2026-04-16 12:33:00', label: '130°C 70%' },
-    { ts: '2026-04-16 14:40:00', label: 'CD 185→120°C' },
-    { ts: '2026-04-16 16:11:00', label: 'CD 120→60°C' },
+    { ts: '2026-04-16 10:35:00', label: '120°C 70%'     },
+    { ts: '2026-04-16 11:05:00', label: '120°C 30%'     },
+    { ts: '2026-04-16 11:46:00', label: '150°C 30%'     },
+    { ts: '2026-04-16 12:33:00', label: '130°C 70%'     },
+    { ts: '2026-04-16 14:40:00', label: 'CD 185→120°C'  },
+    { ts: '2026-04-16 16:11:00', label: 'CD 120→60°C'   },
   ],
 };
 
-const OIL_ALIGN_TEMP = 185.0;
-const DR_CLIP_MAX = 400;
-const DR_CLIP_MIN = -20;
-
-let datasets = {};
-let activeRuns = new Set(['0422', '0423', '0427']);
-let winMin = 10;
-let viewMode = 'smooth';
-let showEvents = false;
-let chart = null;
+const OIL_ALIGN = 185, DR_MAX = 400, DR_MIN = -20;
+let datasets = {}, activeRuns = new Set(['0422','0423','0427']);
+let winMin = 10, viewMode = 'smooth', showEvents = false, chart = null;
+let yMin = -25, yMax = null;
 
 function rolling(arr, win) {
-  const half = Math.floor(win / 2);
-  return arr.map((_, i) => {
-    const lo = Math.max(0, i - half);
-    const hi = Math.min(arr.length - 1, i + half);
-    let sum = 0, count = 0;
-    for (let j = lo; j <= hi; j++) { sum += arr[j]; count++; }
-    return sum / count;
+  const h = Math.floor(win / 2);
+  return arr.map((_,i) => {
+    const lo = Math.max(0, i-h), hi = Math.min(arr.length-1, i+h);
+    let s=0,c=0; for(let j=lo;j<=hi;j++){s+=arr[j];c++;} return s/c;
   });
 }
+function parseTs(s) { return new Date(s.replace(' ','T')).getTime(); }
 
-function parseTs(s) {
-  return new Date(s.replace(' ', 'T')).getTime();
-}
-
-function processCSV(name, rows) {
+function processCSV(rows) {
   rows = rows.filter(r => r.elapsed_hr !== undefined && r.elapsed_hr !== '');
-  rows.sort((a, b) => +a.elapsed_hr - +b.elapsed_hr);
-
-  const oilCol = rows[0] && Object.keys(rows[0]).find(k => k.includes('jacket_oil_temperature'));
-  const drCol  = rows[0] && Object.keys(rows[0]).find(k => k.includes('dry_rate_g_min'));
-  const tsCol  = rows[0] && Object.keys(rows[0]).find(k => k === 'time');
-
-  const oilTemps = rows.map(r => parseFloat(r[oilCol] ?? 0) || 0);
-  const drRaw    = rows.map(r => Math.min(DR_CLIP_MAX, Math.max(DR_CLIP_MIN, parseFloat(r[drCol] ?? 0) || 0)));
-  const elapseds = rows.map(r => parseFloat(r.elapsed_hr));
-  const times    = rows.map(r => r[tsCol] ?? '');
-
-  const hitIdx = oilTemps.findIndex(t => t >= OIL_ALIGN_TEMP);
-  const tZeroElapsed = hitIdx >= 0 ? elapseds[hitIdx] : 0;
-  const tZeroTs      = hitIdx >= 0 ? parseTs(times[hitIdx]) : null;
-
-  const tHr = elapseds.map(e => e - tZeroElapsed);
-
-  return { tHr, drRaw, times, tZeroTs, oilTemps };
+  rows.sort((a,b) => +a.elapsed_hr - +b.elapsed_hr);
+  const oilCol = Object.keys(rows[0]||{}).find(k => k.includes('jacket_oil_temperature'));
+  const drCol  = Object.keys(rows[0]||{}).find(k => k.includes('dry_rate_g_min'));
+  const oils = rows.map(r => parseFloat(r[oilCol])||0);
+  const dr   = rows.map(r => Math.min(DR_MAX, Math.max(DR_MIN, parseFloat(r[drCol])||0)));
+  const el   = rows.map(r => parseFloat(r.elapsed_hr));
+  const ts   = rows.map(r => r.time||'');
+  const hi   = oils.findIndex(t => t >= OIL_ALIGN);
+  const t0el = hi>=0 ? el[hi] : 0;
+  const t0ts = hi>=0 ? parseTs(ts[hi]) : null;
+  return { tHr: el.map(e=>e-t0el), drRaw: dr, tZeroTs: t0ts };
 }
 
-async function loadRun(name) {
-  if (datasets[name]) return datasets[name];
-  const url = BASE + name + '.csv';
-  return new Promise((resolve, reject) => {
-    Papa.parse(url, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: res => {
-        datasets[name] = processCSV(name, res.data);
-        resolve(datasets[name]);
-      },
-      error: reject,
+function loadRun(name) {
+  if (datasets[name]) return Promise.resolve(datasets[name]);
+  return new Promise((res,rej) => {
+    Papa.parse(BASE+name+'.csv', {
+      download:true, header:true, skipEmptyLines:true,
+      complete: r => { datasets[name]=processCSV(r.data); res(datasets[name]); },
+      error: rej,
     });
   });
+}
+
+function computeYBounds() {
+  let max = 0;
+  for (const name of activeRuns) {
+    const d = datasets[name]; if(!d) continue;
+    const sm = rolling(d.drRaw, winMin);
+    const src = (viewMode==='raw') ? d.drRaw : sm;
+    src.forEach(v => { if(v>max) max=v; });
+  }
+  yMax = max > 0 ? Math.ceil(max * 1.12 / 10) * 10 : 300;
+  yMin = -25;
 }
 
 function buildChartData() {
-  const chartDatasets = [];
-
+  const out = [];
   for (const name of activeRuns) {
-    const d = datasets[name];
-    if (!d) continue;
-    const meta = RUNS[name];
+    const d = datasets[name]; if(!d) continue;
+    const { color } = RUNS[name];
     const sm = rolling(d.drRaw, winMin);
-    const color = meta.color;
-
-    if (viewMode === 'raw' || viewMode === 'both') {
-      chartDatasets.push({
-        label: name + '_raw',
-        data: d.tHr.map((t, i) => ({ x: +t.toFixed(4), y: +d.drRaw[i].toFixed(2) })),
-        borderColor: color,
-        backgroundColor: 'transparent',
-        borderWidth: 0.8,
-        pointRadius: 0,
-        tension: 0,
-        parsing: false,
-        borderDash: viewMode === 'both' ? [2, 3] : [],
-        alpha: 0.2,
-        _runName: name,
-        _isSm: false,
+    if (viewMode==='raw'||viewMode==='both') {
+      out.push({
+        label: name+'_raw',
+        data: d.tHr.map((t,i)=>({x:+t.toFixed(4), y:+d.drRaw[i].toFixed(2)})),
+        borderColor: color, backgroundColor:'transparent',
+        borderWidth: viewMode==='both'?0.7:1.2,
+        borderDash: viewMode==='both'?[3,3]:[],
+        pointRadius:0, tension:0, parsing:false,
+        _run:name, _raw:true,
       });
     }
-
-    if (viewMode === 'smooth' || viewMode === 'both') {
-      chartDatasets.push({
-        label: name + '_sm',
-        data: d.tHr.map((t, i) => ({ x: +t.toFixed(4), y: +sm[i].toFixed(2) })),
-        borderColor: color,
-        backgroundColor: 'transparent',
-        borderWidth: viewMode === 'both' ? 2 : 2,
-        pointRadius: 0,
-        tension: 0,
-        parsing: false,
-        _runName: name,
-        _isSm: true,
+    if (viewMode==='smooth'||viewMode==='both') {
+      out.push({
+        label: name+'_sm',
+        data: d.tHr.map((t,i)=>({x:+t.toFixed(4), y:+sm[i].toFixed(2)})),
+        borderColor: color, backgroundColor:'transparent',
+        borderWidth:2, pointRadius:0, tension:0, parsing:false,
+        _run:name, _sm:true,
       });
-    }
-
-    if (showEvents && EVENTS[name] && d.tZeroTs) {
-      for (let ei = 0; ei < EVENTS[name].length; ei++) {
-        const ev = EVENTS[name][ei];
-        const evThr = (parseTs(ev.ts) - d.tZeroTs) / 3600000;
-        chartDatasets.push({
-          label: name + '_ev_' + ei,
-          data: [{ x: +evThr.toFixed(4), y: -20 }, { x: +evThr.toFixed(4), y: 350 }],
-          borderColor: color,
-          backgroundColor: 'transparent',
-          borderWidth: 0.8,
-          borderDash: [4, 4],
-          pointRadius: 0,
-          tension: 0,
-          parsing: false,
-          _isEvent: true,
-          _evLabel: ev.label,
-          _evColor: color,
-        });
-      }
     }
   }
-
-  return chartDatasets;
+  return out;
 }
 
-const eventLabelPlugin = {
-  id: 'eventLabels',
+const eventPlugin = {
+  id: 'evLines',
   afterDraw(chart) {
-    const { ctx, scales: { x, y } } = chart;
-    chart.data.datasets.forEach(ds => {
-      if (!ds._isEvent) return;
-      const xPx = x.getPixelForValue(ds.data[0].x);
-      ctx.save();
-      ctx.fillStyle = ds._evColor;
-      ctx.globalAlpha = 0.75;
-      ctx.font = '9px Courier New';
-      ctx.textAlign = 'left';
-      ctx.translate(xPx + 3, y.getPixelForValue(280));
-      ctx.rotate(-Math.PI / 2);
-      ctx.fillText(ds._evLabel, 0, 0);
-      ctx.restore();
-    });
+    if (!showEvents) return;
+    const { ctx, scales:{x,y}, chartArea:{top,bottom} } = chart;
+    for (const name of activeRuns) {
+      const d = datasets[name]; if(!d||!d.tZeroTs||!EVENTS[name]) continue;
+      const color = RUNS[name].color;
+      EVENTS[name].forEach((ev,ei) => {
+        const evThr = (parseTs(ev.ts) - d.tZeroTs) / 3600000;
+        const xPx = x.getPixelForValue(evThr);
+        if (xPx < chart.chartArea.left || xPx > chart.chartArea.right) return;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.35;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4,4]);
+        ctx.beginPath(); ctx.moveTo(xPx,top); ctx.lineTo(xPx,bottom); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 0.65;
+        ctx.fillStyle = color;
+        ctx.font = '500 9.5px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        const textY = top + 12 + (ei % 5) * 58;
+        ctx.translate(xPx+3, Math.min(textY, bottom-10));
+        ctx.rotate(-Math.PI/2);
+        ctx.fillText(ev.label, 0, 0);
+        ctx.restore();
+      });
+    }
   }
 };
 
 function buildChart() {
   const canvas = document.getElementById('chart');
-  if (chart) { chart.destroy(); chart = null; }
+  if (chart) { chart.destroy(); chart=null; }
+  computeYBounds();
 
-  const gridColor = 'rgba(255,255,255,0.04)';
-  const tickColor = '#3a3d48';
+  const grid = 'rgba(55,53,47,0.06)';
+  const tick = '#9b9a97';
+  const fontCfg = { family:"'Inter', ui-sans-serif, sans-serif", size:11 };
 
   chart = new Chart(canvas, {
-    type: 'line',
-    data: { datasets: buildChartData() },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          filter: item => !item.dataset._isEvent,
-          callbacks: {
-            title: items => {
-              const t = items[0].parsed.x;
-              return `t = ${t.toFixed(2)} hr`;
-            },
-            label: item => {
-              if (item.dataset._isEvent) return null;
-              const name = item.dataset._runName;
-              return ` ${RUNS[name]?.label}: ${item.parsed.y.toFixed(1)} g/min`;
-            }
+    type:'line',
+    data:{ datasets: buildChartData() },
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:false,
+      clip: { left:0, right:0, top:0, bottom:0 },
+      plugins:{
+        legend:{ display:false },
+        tooltip:{
+          backgroundColor:'#fff', borderColor:'#e3e2e0', borderWidth:1,
+          titleColor:'#37352f', bodyColor:'#6b6a67', padding:10,
+          titleFont:{ family:"'Inter',sans-serif", size:12, weight:'500' },
+          bodyFont:{ family:"'Inter',sans-serif", size:12 },
+          callbacks:{
+            title: items => `t = ${items[0].parsed.x.toFixed(2)} hr`,
+            label: item => ` ${RUNS[item.dataset._run]?.label}: ${item.parsed.y.toFixed(1)} g/min`,
           }
         }
       },
-      scales: {
-        x: {
-          type: 'linear',
-          title: { display: true, text: 'Elapsed time since oil at 185°C  [hr]', color: tickColor, font: { family: 'Courier New', size: 11 } },
-          grid: { color: gridColor },
-          ticks: { color: tickColor, font: { family: 'Courier New', size: 10 }, maxTicksLimit: 12 },
+      scales:{
+        x:{
+          type:'linear',
+          title:{ display:true, text:'Elapsed time since oil @ 185°C  (hr)', color:tick, font:fontCfg },
+          grid:{ color:grid }, border:{ color:'#e3e2e0' },
+          ticks:{ color:tick, font:fontCfg, maxTicksLimit:12 },
         },
-        y: {
-          title: { display: true, text: 'Dry rate  [g/min]', color: tickColor, font: { family: 'Courier New', size: 11 } },
-          grid: { color: gridColor },
-          ticks: { color: tickColor, font: { family: 'Courier New', size: 10 } },
-          min: -25,
+        y:{
+          title:{ display:true, text:'Dry rate  (g/min)', color:tick, font:fontCfg },
+          grid:{ color:grid }, border:{ color:'#e3e2e0' },
+          ticks:{ color:tick, font:fontCfg },
+          min: yMin, max: yMax,
         }
       }
     },
-    plugins: [eventLabelPlugin],
+    plugins:[eventPlugin],
   });
 }
 
@@ -447,23 +382,24 @@ function updateLegend() {
   const el = document.getElementById('legend');
   el.innerHTML = '';
   for (const name of activeRuns) {
-    const d = datasets[name];
-    if (!d) continue;
+    const d = datasets[name]; if(!d) continue;
     const sm = rolling(d.drRaw, winMin);
     const peak = Math.max(...sm).toFixed(0);
-    const meta = RUNS[name];
-    el.innerHTML += `
-      <div class="legend-item">
-        <span class="dot" style="background:${meta.color}"></span>
-        <span>${meta.label}</span>
-        <span class="peak">peak ${peak} g/min</span>
-      </div>`;
+    const { color, label } = RUNS[name];
+    el.innerHTML += `<div class="legend-item">
+      <span class="legend-dot" style="background:${color}"></span>
+      <span>${label}</span>
+      <span class="legend-peak">peak ${peak} g/min</span>
+    </div>`;
   }
 }
 
 function rebuildChart() {
+  computeYBounds();
   if (chart) {
     chart.data.datasets = buildChartData();
+    chart.options.scales.y.min = yMin;
+    chart.options.scales.y.max = yMax;
     chart.update('none');
   } else {
     buildChart();
@@ -472,73 +408,54 @@ function rebuildChart() {
 }
 
 async function toggleRun(name) {
-  const pill = document.getElementById('pill-' + name);
+  const pill = document.getElementById('pill-'+name);
   if (activeRuns.has(name)) {
-    activeRuns.delete(name);
-    pill.classList.remove('on');
-    rebuildChart();
+    activeRuns.delete(name); pill.classList.remove('on'); rebuildChart();
   } else {
     activeRuns.add(name);
     if (!datasets[name]) {
-      pill.textContent = name + ' …';
-      try {
-        await loadRun(name);
-        pill.textContent = name;
-      } catch(e) {
-        pill.textContent = name + ' ✕';
-        activeRuns.delete(name);
-        pill.classList.remove('on');
-        return;
-      }
+      const orig = pill.textContent; pill.textContent = name+' …';
+      try { await loadRun(name); pill.textContent = orig; }
+      catch { pill.textContent = name+' ✕'; activeRuns.delete(name); pill.classList.remove('on'); return; }
     }
-    pill.classList.add('on');
-    rebuildChart();
+    pill.classList.add('on'); rebuildChart();
   }
 }
 
 function setView(v) {
   viewMode = v;
-  ['Raw','Smooth','Both'].forEach(s => {
-    document.getElementById('btn' + s).classList.toggle('active', v === s.toLowerCase());
-  });
+  ['Raw','Smooth','Both'].forEach(s =>
+    document.getElementById('btn'+s).classList.toggle('active', v===s.toLowerCase()));
   rebuildChart();
 }
 
 function onSlider(v) {
   winMin = parseInt(v);
-  document.getElementById('winVal').textContent = v + ' min';
+  document.getElementById('winVal').textContent = v+' min';
   rebuildChart();
 }
 
 function toggleEvents() {
   showEvents = !showEvents;
-  const btn = document.getElementById('eventsToggle');
-  btn.classList.toggle('on', showEvents);
-  rebuildChart();
+  document.getElementById('evBtn').classList.toggle('on', showEvents);
+  if (chart) chart.update('none');
 }
 
 async function init() {
   const pillsEl = document.getElementById('pills');
   for (const [name, meta] of Object.entries(RUNS)) {
     const btn = document.createElement('button');
-    btn.className = 'pill' + (activeRuns.has(name) ? ' on' : '');
-    btn.id = 'pill-' + name;
+    btn.className = 'pill'+(activeRuns.has(name)?' on':'');
+    btn.id = 'pill-'+name;
     btn.textContent = name;
-    btn.style.borderColor = meta.color;
-    btn.style.color = meta.color;
+    btn.style.cssText = `border-color:${meta.color};color:${meta.color};`;
     btn.onclick = () => toggleRun(name);
     pillsEl.appendChild(btn);
   }
-
-  const loading = document.getElementById('loading');
-  loading.style.display = 'flex';
-
-  const toLoad = [...activeRuns];
-  await Promise.all(toLoad.map(name => loadRun(name).catch(() => activeRuns.delete(name))));
-
-  loading.style.display = 'none';
-  buildChart();
-  updateLegend();
+  document.getElementById('loading').style.display='flex';
+  await Promise.all([...activeRuns].map(n => loadRun(n).catch(()=>activeRuns.delete(n))));
+  document.getElementById('loading').style.display='none';
+  buildChart(); updateLegend();
 }
 
 init();
