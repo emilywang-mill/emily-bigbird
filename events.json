@@ -1,0 +1,38 @@
+{
+  "0407": [
+    {"timestamp": "2026-04-07 14:18:00", "label": "120C, 50% PWM"},
+    {"timestamp": "2026-04-07 15:40:00", "label": "120C, 70% PWM"},
+    {"timestamp": "2026-04-07 16:08:00", "label": "120C, 25% PWM"},
+    {"timestamp": "2026-04-07 16:35:00", "label": "150C, 50% PWM"},
+    {"timestamp": "2026-04-07 17:05:00", "label": "150C, 25% PWM"},
+    {"timestamp": "2026-04-07 17:31:00", "label": "180C, 25% PWM"}
+  ],
+  "0409": [
+    {"timestamp": "2026-04-09 11:21:00", "label": "Air heater on"},
+    {"timestamp": "2026-04-09 13:12:00", "label": "180C, 22 CFM"}
+  ],
+  "0416": [
+    {"timestamp": "2026-04-16 10:35:00", "label": "120C, 70% PWM"},
+    {"timestamp": "2026-04-16 11:05:00", "label": "120C, 30% PWM"},
+    {"timestamp": "2026-04-16 11:46:00", "label": "150C, 30% PWM"},
+    {"timestamp": "2026-04-16 12:33:00", "label": "130C, 70% PWM"},
+    {"timestamp": "2026-04-16 14:40:00", "label": "CD Start 185->120C"},
+    {"timestamp": "2026-04-16 15:31:00", "label": "Oil 120C"},
+    {"timestamp": "2026-04-16 16:11:00", "label": "CD Start 120->60C"}
+  ],
+  "0423": [
+    {"timestamp": "2026-04-23 11:48:00", "label": "24, 90/30/270"},
+    {"timestamp": "2026-04-23 12:16:00", "label": "24, 30/30/330"},
+    {"timestamp": "2026-04-23 12:45:00", "label": "24, 30/5/330"},
+    {"timestamp": "2026-04-23 13:20:00", "label": "30, 30/5/330"},
+    {"timestamp": "2026-04-23 13:51:00", "label": "30, 270/5/90"},
+    {"timestamp": "2026-04-23 14:25:00", "label": "24, 90/30/270"},
+    {"timestamp": "2026-04-23 15:11:00", "label": "24, 1/1/1000"}
+  ],
+  "0428": [
+    {"timestamp": "2026-04-28 09:52:00", "label": "200 C, 15% PWM (13 CFM) - Bimetallic trip"},
+    {"timestamp": "2026-04-28 10:33:00", "label": "180 C, 20% PWM (7 CFM) - Bimetallic trip"},
+    {"timestamp": "2026-04-28 11:42:00", "label": "180 C, 25% PWM (11 CFM) - Bimetallic trip"},
+    {"timestamp": "2026-04-28 11:48:00", "label": "180 C, 80% PWM (39 CFM)"}
+  ]
+}
