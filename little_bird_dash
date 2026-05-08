@@ -169,6 +169,11 @@ header .status .dot { width:6px; height:6px; border-radius:50%; background:var(-
     <button id="btnXMass" onclick="setXMode('mass')">Water removed</button>
   </div>
 
+  <div class="seg">
+    <button id="btnAlignOil"  onclick="setAlign('oil')">Align: Oil</button>
+    <button id="btnAlignRamp" class="active" onclick="setAlign('ramp')">Align: DR ramp</button>
+  </div>
+
   <div class="spacer"></div>
   <div class="channel-strip" id="activeChannels"></div>
   <button class="add-ch-btn" onclick="openChannelPicker()">+ Add plot</button>
@@ -281,7 +286,8 @@ let RUN_EVENTS = {
 // ══════════════════════════════════════════════════════════
 let RUNS={}, datasets={}, activeRuns=new Set();
 let winMin=10, viewMode='smooth', showEvents=false, showTooltip=true;
-let xMode='time'; // 'time' | 'mass'
+let xMode='time';    // 'time' | 'mass'
+let alignMode='ramp'; // 'oil' | 'ramp'
 let allColumns=[];
 let activePlots=[{id:'plot_dry_rate_0', m:'dry_rate_g_min'}];
 let chartInstances={}, plotIdCounter=1;
@@ -355,18 +361,46 @@ function mergeEv(obj){
 // ══════════════════════════════════════════════════════════
 // CSV
 // ══════════════════════════════════════════════════════════
+
+// Detect the index where dry rate first starts ramping up.
+// Algorithm:
+//   1. Smooth the raw dry rate with a 5-point median to kill spikes.
+//   2. Find the first index where the smoothed DR exceeds DR_RAMP_THRESH
+//      AND stays above it for at least DR_RAMP_SUSTAIN consecutive points.
+// Returns the index into the tHr/dr arrays, or -1 if not found.
+const DR_RAMP_THRESH  = 8;   // g/min — must exceed this
+const DR_RAMP_SUSTAIN = 4;   // consecutive points above threshold
+
+function detectRampIndex(drVals) {
+  const n = drVals.length;
+  // 5-point median smooth to suppress spikes
+  const sm = drVals.map((_, i) => {
+    const w = drVals.slice(Math.max(0,i-2), Math.min(n,i+3));
+    const s = [...w].sort((a,b)=>a-b);
+    return s[Math.floor(s.length/2)];
+  });
+  // Find first sustained crossing
+  for (let i = 0; i < n - DR_RAMP_SUSTAIN; i++) {
+    if (sm[i] >= DR_RAMP_THRESH) {
+      let ok = true;
+      for (let j = 1; j < DR_RAMP_SUSTAIN; j++) {
+        if (sm[i+j] < DR_RAMP_THRESH) { ok=false; break; }
+      }
+      if (ok) return i;
+    }
+  }
+  return -1;
+}
+
 function processCSV(rows){
   rows=rows.filter(r=>r.elapsed_hr!==undefined&&r.elapsed_hr!=='');
   rows.sort((a,b)=>+a.elapsed_hr - +b.elapsed_hr);
   const headers=Object.keys(rows[0]||{});
   if(!allColumns.length) allColumns=headers.filter(h=>h!=='time'&&h!=='elapsed_hr');
-  const oilCol=resolveCol(headers,'d208_jacket_oil_temperature')||resolveCol(headers,'jacket_oil_temperature');
-  const oils=rows.map(r=>parseFloat(r[oilCol])||0);
+
   const el=rows.map(r=>parseFloat(r.elapsed_hr));
   const ts=rows.map(r=>r.time||'');
-  const hi=oils.findIndex(t=>t>=OIL_ALIGN);
-  const t0el=hi>=0?el[hi]:0, t0ts=hi>=0?parseTs(ts[hi]):null;
-  const tHr=el.map(e=>e-t0el);
+
   const channels={};
   for(const h of headers){
     if(h==='time'||h==='elapsed_hr') continue;
@@ -375,20 +409,41 @@ function processCSV(rows){
   const drKey=resolveCol(headers,'dry_rate_g_min');
   if(drKey) channels[drKey]=channels[drKey].map(v=>Math.min(DR_MAX,Math.max(DR_MIN,v)));
 
-  // Compute cumulative water removed (kg) — used as alternative x-axis
-  // Integrate dry_rate (g/min) over time, starting from t=0 (oil align point)
-  const cumWaterKg=new Array(tHr.length).fill(0);
+  // ── Oil-temp alignment (original) ─────────────────────────────────────────
+  const oilCol=resolveCol(headers,'d208_jacket_oil_temperature')||resolveCol(headers,'jacket_oil_temperature');
+  const oils=rows.map(r=>parseFloat(r[oilCol])||0);
+  const oilHi=oils.findIndex(t=>t>=OIL_ALIGN);
+  const t0oil=oilHi>=0?el[oilHi]:0;
+  const t0ts  =oilHi>=0?parseTs(ts[oilHi]):null;
+  const tHrOil=el.map(e=>e-t0oil);
+
+  // ── Dry-rate ramp alignment ────────────────────────────────────────────────
+  // Use the oil-aligned DR array to detect the ramp, then shift to that point.
+  let tHrRamp = tHrOil; // fallback: same as oil if no ramp found
+  let rampTs   = t0ts;
   if(drKey){
-    for(let i=1;i<tHr.length;i++){
-      const dtHr=tHr[i]-tHr[i-1];
-      if(dtHr<=0||dtHr>0.5){cumWaterKg[i]=cumWaterKg[i-1];continue;}
-      // Only accumulate after t=0 and for positive dry rates
-      const dr=tHr[i]>=0?Math.max(0,channels[drKey][i]||0):0;
-      cumWaterKg[i]=cumWaterKg[i-1]+dr*60*dtHr/1000; // g/min * 60min/hr * hr / 1000 = kg
+    const drVals=channels[drKey];
+    const ri=detectRampIndex(drVals);
+    if(ri>=0){
+      const t0ramp=el[ri];
+      tHrRamp=el.map(e=>e-t0ramp);
+      rampTs=ts[ri]?parseTs(ts[ri]):t0ts;
     }
   }
 
-  return {tHr,cumWaterKg,channels,headers,tZeroTs:t0ts};
+  // ── Cumulative water removed — computed from ramp-aligned tHr ─────────────
+  const tHrActive = tHrRamp; // always integrate from ramp point
+  const cumWaterKg=new Array(tHrActive.length).fill(0);
+  if(drKey){
+    for(let i=1;i<tHrActive.length;i++){
+      const dtHr=tHrActive[i]-tHrActive[i-1];
+      if(dtHr<=0||dtHr>0.5){cumWaterKg[i]=cumWaterKg[i-1];continue;}
+      const dr=tHrActive[i]>=0?Math.max(0,channels[drKey][i]||0):0;
+      cumWaterKg[i]=cumWaterKg[i-1]+dr*60*dtHr/1000;
+    }
+  }
+
+  return {tHrOil,tHrRamp,cumWaterKg,channels,headers,tZeroTs:rampTs,tZeroTsOil:t0ts};
 }
 function loadRun(name){
   if(datasets[name]) return Promise.resolve(datasets[name]);
@@ -404,7 +459,8 @@ function loadRun(name){
 // kWh/kg = cumulative_Wh / (cumulative_water_kg × 1000)
 // ══════════════════════════════════════════════════════════
 function computeKwhPerKg(d){
-  const {tHr,channels,headers}=d;
+  const tHr=getTHr(d);
+  const {channels,headers}=d;
   const motorPwrCol=resolveCol(headers,'d201_motor_power');
   const drCol=resolveCol(headers,'dry_rate_g_min');
   if(!motorPwrCol||!drCol) return null;
@@ -429,15 +485,34 @@ function computeKwhPerKg(d){
 // ══════════════════════════════════════════════════════════
 // UTILS
 // ══════════════════════════════════════════════════════════
-function rolling(arr,win){
-  const h=Math.floor(win/2);
-  return arr.map((_,i)=>{
-    const lo=Math.max(0,i-h),hi=Math.min(arr.length-1,i+h);
-    let s=0,c=0; for(let j=lo;j<=hi;j++){s+=arr[j];c++;} return s/c;
+
+// Time-based rolling mean — winMin is a window width in minutes.
+// tHr is the elapsed-hours array (non-uniform OK).
+// For each point i, averages all points within ±(winMin/2) minutes.
+// Falls back to the point itself when no neighbours exist.
+function rolling(arr, winMin, tHr) {
+  const halfHr = (winMin / 2) / 60;  // half-window in hours
+  return arr.map((v, i) => {
+    const center = tHr[i];
+    const lo_t = center - halfHr;
+    const hi_t = center + halfHr;
+    // Binary search for left boundary
+    let lo = 0, hi = tHr.length - 1;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (tHr[m] < lo_t) lo = m + 1; else hi = m; }
+    let s = 0, c = 0;
+    for (let j = lo; j < tHr.length && tHr[j] <= hi_t; j++) {
+      const x = arr[j];
+      if (isFinite(x)) { s += x; c++; }
+    }
+    return c > 0 ? s / c : v;
   });
 }
 function parseTs(s){return new Date(s.replace(' ','T')).getTime();}
-function getXArr(d){ return xMode==='mass' ? d.cumWaterKg : d.tHr; }
+// Returns the active tHr array for a dataset based on current alignMode
+function getTHr(d){ return alignMode==='ramp' ? d.tHrRamp : d.tHrOil; }
+function getXArr(d){ return xMode==='mass' ? d.cumWaterKg : getTHr(d); }
+// Returns the t=0 timestamp for events alignment
+function getT0Ts(d){ return alignMode==='ramp' ? d.tZeroTs : d.tZeroTsOil; }
 function getVals(runName,m){
   const d=datasets[runName]; if(!d) return null;
   if(m==='__kwh_per_kg__') return computeKwhPerKg(d);
@@ -538,7 +613,8 @@ function buildDS(m){
     const d=datasets[name]; if(!d) continue;
     const vals=getVals(name,m); if(!vals) continue;
     const xArr=getXArr(d);
-    const color=RUNS[name].color, sm=rolling(vals,winMin);
+    const tHr=getTHr(d);
+    const color=RUNS[name].color, sm=rolling(vals,winMin,tHr);
     if(viewMode==='raw'||viewMode==='both')
       out.push({label:name+'_raw',data:xArr.map((x,i)=>({x:+x.toFixed(4),y:+vals[i].toFixed(4)})),
         borderColor:color,backgroundColor:'transparent',borderWidth:viewMode==='both'?0.7:1.2,
@@ -555,10 +631,10 @@ function makeEvPlugin(plotId){
     if(!showEvents) return;
     const{ctx,scales:{x},chartArea:{top,bottom}}=chart;
     for(const name of activeRuns){
-      const d=datasets[name]; if(!d||!d.tZeroTs||!RUN_EVENTS[name]) continue;
+      const d=datasets[name]; if(!d||!getT0Ts(d)||!RUN_EVENTS[name]) continue;
       const color=RUNS[name].color;
       RUN_EVENTS[name].forEach((ev,ei)=>{
-        const xPx=x.getPixelForValue((parseTs(ev.ts)-d.tZeroTs)/3600000);
+        const xPx=x.getPixelForValue((parseTs(ev.ts)-getT0Ts(d))/3600000);
         if(xPx<chart.chartArea.left||xPx>chart.chartArea.right) return;
         ctx.save();
         ctx.strokeStyle=color;ctx.globalAlpha=.28;ctx.lineWidth=1;ctx.setLineDash([4,4]);
@@ -583,7 +659,7 @@ function makePeakPlugin(plotId, m){
       for(const name of activeRuns){
         const d=datasets[name]; if(!d) continue;
         const vals=getVals(name,m); if(!vals) continue;
-        const sm=rolling(vals,winMin);
+        const sm=rolling(vals,winMin,getTHr(d));
         const peak=Math.max(...sm.filter(isFinite));
         if(!isFinite(peak)) continue;
         const yPx=y.getPixelForValue(peak);
@@ -640,7 +716,11 @@ function buildSingleChart(plotId,m){
 
   const isLast=plotId===activePlots[activePlots.length-1].id;
   const isZoom=interactionMode==='zoom';
-  const xLabel=xMode==='mass'?'Cumulative water removed (kg)':'Elapsed time since oil @ 185°C (hr)';
+  const xLabel = xMode==='mass'
+    ? 'Cumulative water removed (kg)'
+    : alignMode==='ramp'
+      ? 'Time since dry rate ramp start (hr)'
+      : 'Elapsed time since oil @ 185°C (hr)';
 
   // Sync callback — fires on both zoom and pan, live
   function onSync({chart}){
@@ -708,7 +788,7 @@ function updateLegend(plotId,m){
   for(const name of activeRuns){
     const d=datasets[name]; if(!d) continue;
     const vals=getVals(name,m); if(!vals) continue;
-    const sm=rolling(vals,winMin), peak=Math.max(...sm.filter(isFinite));
+    const sm=rolling(vals,winMin,getTHr(d)), peak=Math.max(...sm.filter(isFinite));
     el.innerHTML+=`<div class="legend-item">
       <span class="legend-dot" style="background:${RUNS[name].color}"></span>
       <span>${name}</span>
@@ -738,7 +818,9 @@ function showTT(cx,cy,xVal){
   const card=document.getElementById('tooltip-card');
   const xLabel=xMode==='mass'
     ? `water = ${xVal.toFixed(3)} kg`
-    : `t = ${xVal.toFixed(3)} hr`;
+    : alignMode==='ramp'
+      ? `t_ramp = ${xVal.toFixed(3)} hr`
+      : `t_oil = ${xVal.toFixed(3)} hr`;
   let html=`<div class="tt-time">${xLabel}</div>`;
   for(const{id,m}of activePlots){
     const s=getSensor(m);
@@ -749,7 +831,10 @@ function showTT(cx,cy,xVal){
       const xArr=getXArr(d);
       let lo=0,hi=xArr.length-1;
       while(lo<hi-1){const mid=(lo+hi)>>1;if(xArr[mid]<=xVal)lo=mid;else hi=mid;}
-      const src=viewMode==='raw'?vals:rolling(vals,winMin);
+      // For tooltip, look up the value closest to xVal
+      // In smooth mode, use the pre-rolled array; in raw mode, use raw vals.
+      // We compute rolling lazily here only for the tooltip reading.
+      const src=viewMode==='raw'?vals:rolling(vals,winMin,getTHr(d));
       const v=src[lo];
       html+=`<div class="tt-row">
         <span class="tt-dot" style="background:${RUNS[name].color}"></span>
@@ -808,6 +893,14 @@ function toggleTooltip(){
   showTooltip=!showTooltip;
   document.getElementById('ttBtn').classList.toggle('on',showTooltip);
   if(!showTooltip) document.getElementById('tooltip-card').style.display='none';
+}
+function setAlign(mode){
+  alignMode=mode;
+  document.getElementById('btnAlignOil').classList.toggle('active',mode==='oil');
+  document.getElementById('btnAlignRamp').classList.toggle('active',mode==='ramp');
+  hasZoomed=false;
+  document.getElementById('zoomReset').classList.remove('vis');
+  rebuildAll();
 }
 function setXMode(mode){
   xMode=mode;
