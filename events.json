@@ -72,6 +72,29 @@
     {"timestamp": "2026-05-07 14:33:00", "label": "Air 180 C"},
     {"timestamp": "2026-05-07 15:03:00", "label": "Air 160 C"},
     {"timestamp": "2026-05-07 15:39:00", "label": "Errors post"},
-    {"timestamp": "2026-05-06 18:02:00", "label": "CD"}
+    {"timestamp": "2026-05-07 18:02:00", "label": "CD"}
   ]
+  "0511": [
+    {"timestamp": "2026-05-11 12:18:00", "label": "Dew Point, Air 100% PWM (45 CFM)"},
+    {"timestamp": "2026-05-11 12:38:00", "label": "70% PWM (30 CFM)"},
+    {"timestamp": "2026-05-11 12:58:00", "label": "100% PWM (45 CFM)"},
+    {"timestamp": "2026-05-11 13:18:00", "label": "70% PWM (30 CFM)"},
+    {"timestamp": "2026-05-11 13:38:00", "label": "100% PWM (45 CFM)"},
+    {"timestamp": "2026-05-11 13:58:00", "label": "70% PWM (30 CFM)"},
+    {"timestamp": "2026-05-11 14:18:00", "label": "100% PWM (45 CFM)"},
+    {"timestamp": "2026-05-11 14:38:00", "label": "70% PWM (30 CFM)"},
+    {"timestamp": "2026-05-11 14:58:00", "label": "100% PWM (45 CFM)"},
+     {"timestamp": "2026-05-11 15:18:00", "label": "70% PWM (30 CFM)"},
+    {"timestamp": "2026-05-11 15:38:00", "label": "100% PWM (45 CFM)"},
+    {"timestamp": "2026-05-11 15:58:00", "label": "70% PWM (30 CFM)"},
+    {"timestamp": "2026-05-11 16:18:00", "label": "100% PWM (45 CFM)"},
+    {"timestamp": "2026-05-11 16:38:00", "label": "70% PWM (30 CFM)"},
+    {"timestamp": "2026-05-11 16:58:00", "label": "100% PWM (45 CFM)"},
+     {"timestamp": "2026-05-11 17:18:00", "label": "70% PWM (30 CFM)"},
+    {"timestamp": "2026-05-11 17:38:00", "label": "100% PWM (45 CFM)"},
+    {"timestamp": "2026-05-11 17:58:00", "label": "70% PWM (30 CFM)"},
+    {"timestamp": "2026-05-11 18:18:00", "label": "100% PWM (45 CFM)"},
+    {"timestamp": "2026-05-11 18:38:00", "label": "70% PWM (30 CFM)"},
+    {"timestamp": "2026-05-11 18:58:00", "label": "100% PWM (45 CFM)"},
+    {"timestamp": "2026-05-11 18:30:00", "label": "CD"}
 }
