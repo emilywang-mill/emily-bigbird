@@ -97,5 +97,16 @@
     {"timestamp": "2026-05-11 18:38:00", "label": "70% PWM (30 CFM)"},
     {"timestamp": "2026-05-11 18:58:00", "label": "100% PWM (45 CFM)"},
     {"timestamp": "2026-05-11 18:30:00", "label": "CD"}
+  ],
+  "0512": [
+    {"timestamp": "2026-05-12 12:30:00", "label": "Dew Point, Air 100% PWM (45 CFM)"},
+    {"timestamp": "2026-05-12 14:17:00", "label": "pi reboot"},
+    {"timestamp": "2026-05-12 15:22:00", "label": "Oil Ramp"},
+    {"timestamp": "2026-05-12 17:00:00", "label": "CD"}
+  ],
+  "0513": [
+    {"timestamp": "2026-05-13 12:15:00", "label": "Dew Point, Air 100% PWM (45 CFM)"},
+    {"timestamp": "2026-05-13 14:16:00", "label": "Oil Ramp"},
+    {"timestamp": "2026-05-13 17:16:00", "label": "CD"}
   ]
 }
