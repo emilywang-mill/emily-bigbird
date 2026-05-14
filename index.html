@@ -114,6 +114,19 @@ header .status .dot { width:6px; height:6px; border-radius:50%; background:var(-
 .legend-dot { width:7px; height:7px; border-radius:1px; flex-shrink:0; }
 .legend-peak { color:var(--muted2); margin-left:2px; }
 
+/* ─ y-axis scale control ─ */
+.y-scale-wrap { display:flex; align-items:center; gap:4px; margin-left:8px; }
+.y-scale-input { width:54px; padding:2px 5px; font-family:var(--mono); font-size:10px;
+  background:var(--bg); border:1px solid var(--border); border-radius:3px; color:var(--text);
+  outline:none; text-align:right; -moz-appearance:textfield; }
+.y-scale-input::-webkit-inner-spin-button,.y-scale-input::-webkit-outer-spin-button{-webkit-appearance:none;}
+.y-scale-input:focus { border-color:var(--border2); }
+.y-scale-input.active { border-color:var(--accent); background:rgba(26,110,60,.05); }
+.y-scale-sep { font-size:10px; color:var(--muted2); }
+.y-scale-reset { font-size:9px; color:var(--muted2); cursor:pointer; background:none; border:none;
+  padding:1px 3px; border-radius:2px; font-family:var(--mono); transition:color .1s; line-height:1; }
+.y-scale-reset:hover { color:var(--danger); }
+
 /* ─ crosshair + tooltip ─ */
 #crosshair-overlay { position:fixed; top:0; left:0; width:1px; pointer-events:none; z-index:50; background:rgba(26,110,60,.5); display:none; }
 #tooltip-card { position:fixed; background:var(--surface); border:1px solid var(--border2); border-radius:5px; padding:8px 12px; font-size:11px; pointer-events:none; z-index:60; display:none; max-width:290px; box-shadow:0 4px 20px rgba(0,0,0,.12); }
@@ -214,8 +227,19 @@ const OIL_ALIGN = 185, DR_MAX = 400, DR_MIN = -20;
 //   PV OUT  → Condenser ΔP         (d207 outlet is actually condenser side)
 //   Air heater out → Blower Fan ΔP (d407)
 const SENSORS = [
+  // ── Derived ──────────────────────────────────────────────
+  { m:'dry_rate_g_min',   l:'Dry Rate',          u:'g/min',  g:'Derived', c:'#1a6e3c', derived:true },
+  { m:'predicted_mc_pct', l:'Estimated MC',       u:'%',      g:'Derived', c:'#059669', derived:true },
+  { m:'__airflow__',      l:'Estimated Airflow',  u:'CFM',    g:'Derived', c:'#0284c7', derived:true },
+  { m:'total_kwh_per_kg', l:'Total kWh/kg',       u:'kWh/kg', g:'Derived', c:'#b45309', derived:true },
+  // ── Energy (kWh per subsystem, from exporter) ────────────
+  { m:'motor_kwh',   l:'Motor kWh',      u:'kWh', g:'Energy', c:'#1d4ed8' },
+  { m:'oil_kwh',     l:'Oil Heater kWh', u:'kWh', g:'Energy', c:'#8b5cf6' },
+  { m:'cooling_kwh', l:'Condenser kWh',  u:'kWh', g:'Energy', c:'#db2777' },
+  { m:'blower_kwh',  l:'Blower kWh',     u:'kWh', g:'Energy', c:'#064e3b' },
+  { m:'air_kwh',     l:'Air Heater kWh', u:'kWh', g:'Energy', c:'#f59e0b' },
+  { m:'__total_kwh__', l:'Total kWh',      u:'kWh', g:'Energy', c:'#111827', derived:true },
   // ── Process Vessel ──────────────────────────────────────
-  { m:'dry_rate_g_min',                           l:'Dry Rate',                   u:'g/min',  g:'Process Vessel',     c:'#1a6e3c' },
   { m:'mass_g',                                   l:'Mass',                       u:'g',      g:'Process Vessel',     c:'#3a9e5c' },
   { m:'d208_jacket_oil_temperature',              l:'Oil Temp',                   u:'°C',     g:'Process Vessel',     c:'#d4700a' },
   { m:'d202_oil_heater_controller_pwm_1',         l:'Oil Heater PWM',             u:'%',      g:'Process Vessel',     c:'#e8930d' },
@@ -233,38 +257,56 @@ const SENSORS = [
   { m:'d206_process_vessel_outlet_mixing_ratio',  l:'PV Outlet Mixing Ratio',     u:'g/kg',   g:'PV Air',             c:'#e86f60' },
   { m:'d206_process_vessel_outlet_relative_humidity', l:'PV Outlet RH',           u:'%',      g:'PV Air',             c:'#f08072' },
   // ── Pressure ─────────────────────────────────────────────
-  { m:'d204_process_vessel_inlet_gauge_pressure', l:'PV ΔP (PV In)',              u:'Pa',     g:'Pressure',           c:'#7c3aed' },
+  { m:'d204_process_vessel_inlet_gauge_pressure', l:'PV ΔP',                      u:'Pa',     g:'Pressure',           c:'#7c3aed' },
   { m:'d207_process_vessel_outlet_gauge_pressure',l:'Condenser ΔP (PV Out)',      u:'Pa',     g:'Pressure',           c:'#8b4cf0' },
-  { m:'d303_condenser_inlet_gauge_pressure',      l:'Condenser ΔP (Inlet)',       u:'Pa',     g:'Pressure',           c:'#9d5ef2' },
-  { m:'d306_condenser_outlet_gauge_pressure',     l:'Condenser ΔP (Outlet)',      u:'Pa',     g:'Pressure',           c:'#af70f4' },
-  { m:'d404_blower_fan_inlet_gauge_pressure',     l:'Blower Fan ΔP (Inlet)',      u:'Pa',     g:'Pressure',           c:'#c182f6' },
-  { m:'d407_air_heater_outlet_gauge_pressure',    l:'Blower Fan ΔP (Air Heater)', u:'Pa',     g:'Pressure',           c:'#d394f8' },
-  { m:'d406_system_airflow',                      l:'System Airflow (ΔP)',         u:'Pa',     g:'Pressure',           c:'#5b21b6' },
-  { m:'d409_barometric_pressure',                 l:'Barometric Pressure',        u:'kPa',    g:'Pressure',           c:'#4c1d95' },
+  { m:'d407_air_heater_outlet_gauge_pressure',    l:'Blower Fan ΔP',              u:'Pa',     g:'Pressure',           c:'#d394f8' },
   // ── Air Handler ──────────────────────────────────────────
   { m:'d401_air_heater_controller_pwm',           l:'Air Heater PWM',             u:'%',      g:'Air Handler',        c:'#0891b2' },
   { m:'d402_blower_fan_controller_pwm',           l:'Blower Fan PWM',             u:'%',      g:'Air Handler',        c:'#06b6d4' },
-  { m:'d403_blower_fan_inlet_temperature_1',      l:'Blower Fan Inlet Temp',      u:'°C',     g:'Air Handler',        c:'#22d3ee' },
+  { m:'d402_blower_fan_controller_setpoint',      l:'Blower Fan Setpoint',        u:'%',      g:'Air Handler',        c:'#0284c7' },
   { m:'d405_blower_inlet_relative_humidity',      l:'Blower Inlet RH',            u:'%',      g:'Air Handler',        c:'#67e8f9' },
-  { m:'d405_blower_inlet_temperature_2',          l:'Blower Inlet Temp',          u:'°C',     g:'Air Handler',        c:'#164e63' },
-  { m:'d408_air_heater_outlet_temperature',       l:'Air Heater Outlet Temp',     u:'°C',     g:'Air Handler',        c:'#0e7490' },
+  // ── Temperature ─────────────────────────────────────────
+  { m:'d403_blower_fan_inlet_temperature_1',      l:'Blower Fan Inlet Temp',      u:'°C',     g:'Temperature',        c:'#22d3ee' },
+  { m:'d405_blower_inlet_temperature_2',          l:'Blower Inlet Temp',          u:'°C',     g:'Temperature',        c:'#164e63' },
+  { m:'d408_air_heater_outlet_temperature',       l:'Air Heater Outlet Temp',     u:'°C',     g:'Temperature',        c:'#0e7490' },
+  { m:'d302_condenser_inlet_temperature',         l:'Condenser Inlet Temp',       u:'°C',     g:'Temperature',        c:'#be185d' },
+  { m:'d304_condenser_outlet_temperature_1',      l:'Condenser Outlet Temp',      u:'°C',     g:'Temperature',        c:'#db2777' },
+  { m:'d305_condenser_outlet_temperature_2',      l:'Condenser Outlet Temp 2',    u:'°C',     g:'Temperature',        c:'#f472b6' },
+  { m:'d307_ambient',                             l:'Ambient Temp',               u:'°C',     g:'Temperature',        c:'#9f1239' },
+  { m:'d308_cooling_air_inlet_temperature',       l:'Cooling Air Inlet Temp',     u:'°C',     g:'Temperature',        c:'#c026d3' },
+  { m:'d309_cooling_air_outlet_temperature',      l:'Cooling Air Outlet Temp',    u:'°C',     g:'Temperature',        c:'#e879f9' },
+  { m:'d310_condensate_temperature',              l:'Condensate Temp',            u:'°C',     g:'Temperature',        c:'#6b21a8' },
+  { m:'d311_condensate_drum_inlet_temperature',   l:'Condensate Inlet Temp',      u:'°C',     g:'Temperature',        c:'#4c1d95' },
+  // ── External Thermocouples — column names match CSV: thermocouples__chX ────
+  // ch0=wall_high  ch1=wall_low  ch2=cond_in   ch3=cond_out
+  // ch4=cool_air_in  ch5=heat_air_out  ch6=cool_air_out  ch7=ambient
+  { m:'thermocouples__ch0', l:'Wall High Temp',    u:'°C', g:'External Thermocouples', c:'#b91c1c' },
+  { m:'thermocouples__ch1', l:'Wall Low Temp',     u:'°C', g:'External Thermocouples', c:'#dc2626' },
+  { m:'thermocouples__ch2', l:'Cond In Temp',      u:'°C', g:'External Thermocouples', c:'#ef4444' },
+  { m:'thermocouples__ch3', l:'Cond Out Temp',     u:'°C', g:'External Thermocouples', c:'#f87171' },
+  { m:'thermocouples__ch4', l:'Cool Air In Temp',  u:'°C', g:'External Thermocouples', c:'#fca5a5' },
+  { m:'thermocouples__ch5', l:'Heat Air Out Temp', u:'°C', g:'External Thermocouples', c:'#fb923c' },
+  { m:'thermocouples__ch6', l:'Cool Air Out Temp', u:'°C', g:'External Thermocouples', c:'#f97316' },
+  { m:'thermocouples__ch7', l:'Ambient Temp (TC)', u:'°C', g:'External Thermocouples', c:'#ea580c' },
   // ── Condenser ────────────────────────────────────────────
-  { m:'d302_condenser_inlet_temperature',         l:'Condenser Inlet Temp',       u:'°C',     g:'Condenser',          c:'#be185d' },
-  { m:'d304_condenser_outlet_temperature_1',      l:'Condenser Outlet Temp',      u:'°C',     g:'Condenser',          c:'#db2777' },
   { m:'d305_condenser_outlet_relative_humidity',  l:'Condenser Outlet RH',        u:'%',      g:'Condenser',          c:'#ec4899' },
-  { m:'d305_condenser_outlet_temperature_2',      l:'Condenser Outlet Temp 2',    u:'°C',     g:'Condenser',          c:'#f472b6' },
   { m:'d301_cooling_fan_controller_pwm',          l:'Cooling Fan PWM',            u:'%',      g:'Condenser',          c:'#9d174d' },
   { m:'d307_ambient_relative_humidity',           l:'Ambient RH',                 u:'%',      g:'Condenser',          c:'#831843' },
-  { m:'d307_ambient',                             l:'Ambient Temp',               u:'°C',     g:'Condenser',          c:'#9f1239' },
   { m:'d308_cooling_air_inlet_relative_humidity', l:'Cooling Air Inlet RH',       u:'%',      g:'Condenser',          c:'#a21caf' },
-  { m:'d308_cooling_air_inlet_temperature',       l:'Cooling Air Inlet Temp',     u:'°C',     g:'Condenser',          c:'#c026d3' },
   { m:'d309_cooling_air_outlet_relative_humidity',l:'Cooling Air Outlet RH',      u:'%',      g:'Condenser',          c:'#d946ef' },
-  { m:'d309_cooling_air_outlet_temperature',      l:'Cooling Air Outlet Temp',    u:'°C',     g:'Condenser',          c:'#e879f9' },
-  { m:'d310_condensate_temperature',              l:'Condensate Temp',            u:'°C',     g:'Condenser',          c:'#6b21a8' },
   { m:'d311_condensate_drum_inlet_flow',          l:'Condensate Flow',            u:'mL/min', g:'Condenser',          c:'#7c3aed' },
-  { m:'d311_condensate_drum_inlet_temperature',   l:'Condensate Inlet Temp',      u:'°C',     g:'Condenser',          c:'#4c1d95' },
-  // ── Derived ──────────────────────────────────────────────
-  { m:'__kwh_per_kg__', l:'Energy Efficiency', u:'kWh/kg', g:'Derived', c:'#b45309', derived:true },
+  // ── Current (RMS) — column names match CSV: current__chX_rms ────────────
+  // ch0=motor  ch1=oil heater  ch2=PV  ch3=spare  ch4=condenser
+  // ch5=air box  ch6=air heater  ch7=blower
+  { m:'current__ch0_rms',  l:'Motor Current RMS',      u:'A',  g:'Current', c:'#1d4ed8' },
+  { m:'current__ch1_rms',  l:'Oil Heater Current RMS', u:'A',  g:'Current', c:'#8b5cf6' },
+  { m:'current__ch2_rms',  l:'PV Current RMS',         u:'A',  g:'Current', c:'#06b6d4' },
+  { m:'current__ch3_rms',  l:'Spare Current RMS',      u:'A',  g:'Current', c:'#9ca3af' },
+  { m:'current__ch4_rms',  l:'Condenser Current RMS',  u:'A',  g:'Current', c:'#db2777' },
+  { m:'current__ch5_rms',  l:'Air Box Current RMS',    u:'A',  g:'Current', c:'#059669' },
+  { m:'current__ch6_rms',  l:'Air Heater Current RMS', u:'A',  g:'Current', c:'#f59e0b' },
+  { m:'current__ch7_rms',  l:'Blower Current RMS',     u:'A',  g:'Current', c:'#064e3b' },
+  { m:'__total_current__', l:'Total Current RMS',      u:'A',  g:'Current', c:'#111827', derived:true },
 ];
 
 const RUN_COLORS = [
@@ -291,6 +333,7 @@ let alignMode='ramp'; // 'oil' | 'ramp'
 let allColumns=[];
 let activePlots=[{id:'plot_dry_rate_0', m:'dry_rate_g_min'}];
 let chartInstances={}, plotIdCounter=1;
+const yOverride={};  // plotId → {min, max} or undefined
 let interactionMode='zoom', hasZoomed=false;
 let modalSelected=new Set();
 let isSyncing=false; // prevent zoom sync recursion
@@ -454,32 +497,48 @@ function loadRun(name){
 }
 
 // ══════════════════════════════════════════════════════════
-// DERIVED: kWh/kg
-// Energy = motor_power + estimated heater power (ch1+ch2+ch3 rms × bus voltage)
-// kWh/kg = cumulative_Wh / (cumulative_water_kg × 1000)
+// DERIVED: Estimated Airflow (CFM)
+// Energy-balance method matching the reference Python implementation:
+//   ah_q  = ch6_rms × 208 V × (ah_pwm / 100)          [W]
+//   rho   = P_atm / (R_air × T_inlet_K)                [kg/m³]
+//   kg_s  = ah_q / (Cp_air × ΔT)   where |ΔT| > 2 °C  [kg/s]
+//   CFM   = kg_s / rho × 35.3147 × 60,  clipped ≥ 0
+// Columns: heat_air_current_rms (ch6_rms), d401 ah_pwm,
+//          d403/d405 t_inlet, d408 t_outlet
 // ══════════════════════════════════════════════════════════
-function computeKwhPerKg(d){
-  const tHr=getTHr(d);
+function computeAirflow(d){
   const {channels,headers}=d;
-  const motorPwrCol=resolveCol(headers,'d201_motor_power');
-  const drCol=resolveCol(headers,'dry_rate_g_min');
-  if(!motorPwrCol||!drCol) return null;
-  const busVCol=resolveCol(headers,'d201_motor_dc_bus_voltage');
-  const n=tHr.length;
-  const cumWh=new Array(n).fill(0), cumKg=new Array(n).fill(0);
-  for(let i=1;i<n;i++){
-    const dtHr=tHr[i]-tHr[i-1];
-    if(dtHr<=0||dtHr>0.1){cumWh[i]=cumWh[i-1];cumKg[i]=cumKg[i-1];continue;}
-    let pw=Math.max(0,channels[motorPwrCol][i]||0);
-    const busV=busVCol?(channels[busVCol][i]||48):48;
-    for(const ch of ['current__ch1_rms','current__ch2_rms','current__ch3_rms']){
-      const col=resolveCol(headers,ch);
-      if(col) pw+=Math.abs(channels[col][i]||0)*busV;
-    }
-    cumWh[i]=cumWh[i-1]+pw*dtHr;
-    cumKg[i]=cumKg[i-1]+Math.max(0,channels[drCol][i]||0)*60*dtHr/1000;
+  const V_SUPPLY  = 208.0;
+  const P_ATM     = 101325.0;
+  const R_AIR     = 287.05;
+  const CP_AIR    = 1006.0;
+  const M3_TO_CFM = 35.3147;
+
+  const rmsCol     = resolveCol(headers,'current__ch6_rms');
+  const pwmCol     = resolveCol(headers,'d401_air_heater_controller_pwm');
+  const tInletCol  = resolveCol(headers,'d403_blower_fan_inlet_temperature_1')
+                  || resolveCol(headers,'d405_blower_inlet_temperature_2');
+  const tOutletCol = resolveCol(headers,'d408_air_heater_outlet_temperature');
+
+  if(!rmsCol||!pwmCol||!tInletCol||!tOutletCol) return null;
+
+  const rms     = channels[rmsCol];
+  const pwm     = channels[pwmCol];
+  const tInlet  = channels[tInletCol];
+  const tOutlet = channels[tOutletCol];
+  const n       = rms.length;
+  const result  = new Array(n).fill(NaN);
+
+  for(let i=0;i<n;i++){
+    const deltaT = (tOutlet[i]||0) - (tInlet[i]||0);
+    if(Math.abs(deltaT) <= 2.0) continue;
+    const ahQ  = (rms[i]||0) * V_SUPPLY * ((pwm[i]||0) / 100.0);
+    const rho  = P_ATM / (R_AIR * ((tInlet[i]||0) + 273.15));
+    const kgS  = ahQ / (CP_AIR * deltaT);
+    const cfm  = (M3_TO_CFM * 60.0 * kgS) / rho;
+    result[i]  = Math.max(0, cfm);
   }
-  return cumWh.map((e,i)=>cumKg[i]<0.001?0:e/1000/cumKg[i]);
+  return result;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -515,7 +574,19 @@ function getXArr(d){ return xMode==='mass' ? d.cumWaterKg : getTHr(d); }
 function getT0Ts(d){ return alignMode==='ramp' ? d.tZeroTs : d.tZeroTsOil; }
 function getVals(runName,m){
   const d=datasets[runName]; if(!d) return null;
-  if(m==='__kwh_per_kg__') return computeKwhPerKg(d);
+  if(m==='__airflow__') return computeAirflow(d);
+  if(m==='__total_current__'){
+    const cols=[0,1,2,3,4,5,6,7].map(i=>resolveCol(d.headers,`current__ch${i}_rms`)).filter(Boolean);
+    if(!cols.length) return null;
+    const n=d.channels[cols[0]].length;
+    return Array.from({length:n},(_,i)=>cols.reduce((s,c)=>s+(d.channels[c][i]||0),0));
+  }
+  if(m==='__total_kwh__'){
+    const cols=['motor_kwh','oil_kwh','cooling_kwh','blower_kwh','air_kwh'].map(k=>resolveCol(d.headers,k)).filter(Boolean);
+    if(!cols.length) return null;
+    const n=d.channels[cols[0]].length;
+    return Array.from({length:n},(_,i)=>cols.reduce((s,c)=>s+(d.channels[c][i]||0),0));
+  }
   const col=resolveCol(d.headers,m); if(!col) return null;
   return d.channels[col];
 }
@@ -590,6 +661,14 @@ function renderPlotRow({id,m}){
     <div class="chart-row-header">
       <span style="display:inline-block;width:8px;height:8px;border-radius:1px;background:${s.c};flex-shrink:0;"></span>
       <span class="chart-row-title">${s.l}${s.u?' — '+s.u:''}</span>
+      <div class="y-scale-wrap">
+        <input class="y-scale-input" id="ymin-${id}" type="number" placeholder="min"
+          title="Y-axis min" onchange="setYOverride('${id}')" onkeydown="if(event.key==='Enter')setYOverride('${id}')">
+        <span class="y-scale-sep">–</span>
+        <input class="y-scale-input" id="ymax-${id}" type="number" placeholder="max"
+          title="Y-axis max" onchange="setYOverride('${id}')" onkeydown="if(event.key==='Enter')setYOverride('${id}')">
+        <button class="y-scale-reset" id="yreset-${id}" onclick="resetYOverride('${id}')" title="Reset to auto" style="display:none">↺</button>
+      </div>
       <button class="chart-row-remove" onclick="removePlot('${id}')" title="Remove">×</button>
     </div>
     <div class="chart-canvas-wrap" id="wrap-${id}">
@@ -697,6 +776,12 @@ function buildSingleChart(plotId,m){
   dsList.forEach(ds=>ds.data.forEach(p=>{if(p.y>yMx)yMx=p.y;if(p.y<yMn)yMn=p.y;}));
   if(!isFinite(yMx)){yMx=100;yMn=0;}
   const pad=Math.max((yMx-yMn)*.1,1); yMx+=pad; yMn-=pad;
+  // Apply manual y-axis override if set
+  const ov=yOverride[plotId];
+  if(ov){
+    if(ov.min!==undefined) yMn=ov.min;
+    if(ov.max!==undefined) yMx=ov.max;
+  }
 
   // Compute native x bounds from data
   let xNatMin=Infinity,xNatMax=-Infinity;
@@ -777,6 +862,31 @@ function buildSingleChart(plotId,m){
   updateLegend(plotId,m);
 }
 
+function setYOverride(plotId){
+  const minEl=document.getElementById('ymin-'+plotId);
+  const maxEl=document.getElementById('ymax-'+plotId);
+  const resetEl=document.getElementById('yreset-'+plotId);
+  const minVal=minEl.value.trim(), maxVal=maxEl.value.trim();
+  const hasMin=minVal!=='', hasMax=maxVal!=='';
+  if(!hasMin&&!hasMax){ resetYOverride(plotId); return; }
+  yOverride[plotId]={};
+  if(hasMin){ yOverride[plotId].min=parseFloat(minVal); minEl.classList.add('active'); }
+  else minEl.classList.remove('active');
+  if(hasMax){ yOverride[plotId].max=parseFloat(maxVal); maxEl.classList.add('active'); }
+  else maxEl.classList.remove('active');
+  if(resetEl) resetEl.style.display='inline';
+  const p=activePlots.find(p=>p.id===plotId); if(p) buildSingleChart(plotId,p.m);
+}
+function resetYOverride(plotId){
+  delete yOverride[plotId];
+  const minEl=document.getElementById('ymin-'+plotId);
+  const maxEl=document.getElementById('ymax-'+plotId);
+  const resetEl=document.getElementById('yreset-'+plotId);
+  if(minEl){minEl.value='';minEl.classList.remove('active');}
+  if(maxEl){maxEl.value='';maxEl.classList.remove('active');}
+  if(resetEl) resetEl.style.display='none';
+  const p=activePlots.find(p=>p.id===plotId); if(p) buildSingleChart(plotId,p.m);
+}
 function rebuildAll(){activePlots.forEach(({id,m})=>buildSingleChart(id,m));}
 
 // ══════════════════════════════════════════════════════════
@@ -963,10 +1073,44 @@ function renderModal(filter){
     });
   }
   // Raw columns (not matched by any sensor def)
+  // Build a set of all known sensor column names for exact exclusion
+  const SENSOR_NAMES = new Set(SENSORS.map(s=>s.m.toLowerCase()).filter(m=>!m.startsWith('__')));
+  // Additional explicit exclusions (removed sensors + all raw current/TC channel variants)
+  const EXCLUDED_RAW = new Set([
+    'd202_oil_heater_controller_pwm_2','d202_oil_heater_controller_pwm_3',
+    'internal_chip_temp','condenser_out_airflow',
+    // raw TC bare channel names (pre-measurement-prefix era)
+    'ch0','ch1','ch2','ch3','ch4','ch5','ch6','ch7',
+    // old friendly TC names (pre-CSV-column-name era)
+    'wall_high_temp','wall_low_temp','cond_in_temp','cond_out_temp',
+    'cool_air_in_temp','heat_air_out_temp','cool_air_out_temp','ambient_temp',
+    // old short-name current variants (peak, w, rms)
+    'ch0_peak','ch0_rms','ch0_w','ch1_peak','ch1_rms','ch1_w',
+    'ch2_peak','ch2_rms','ch3_peak','ch3_rms',
+    'ch4_peak','ch4_rms','ch4_w','ch5_peak','ch5_rms',
+    'ch6_peak','ch6_rms','ch6_w','ch7_peak','ch7_rms','ch7_w',
+    // old friendly-name current variants
+    'motor_current_rms','motor_current_peak','motor_power',
+    'oil_heat_1_current_rms','oil_heat_1_current_peak','oil_heat_1_power',
+    'pv_current_rms','pv_current_peak',
+    'spare_current_rms','spare_current_peak',
+    'cond_current_rms','cond_current_peak','cond_power',
+    'air_box_current_rms','air_box_current_peak',
+    'heat_air_current_rms','heat_air_current_peak','heat_air_power',
+    'blower_current_rms','blower_current_peak','blower_power',
+  ]);
   if(allColumns.length){
     const raw=allColumns.filter(col=>{
-      if(SENSORS.some(s=>col.toLowerCase().includes(s.m.toLowerCase()))) return false;
-      if(f&&!col.toLowerCase().includes(f)) return false;
+      const lc=col.toLowerCase();
+      if(SENSOR_NAMES.has(lc)) return false;
+      if(EXCLUDED_RAW.has(lc)) return false;
+      // Exclude all current__chX_* variants (peak, rms, w) not already in SENSORS
+      if(/^current__ch\d_(rms|peak|w)$/.test(lc)) return false;
+      // Exclude all thermocouples__chX variants not already in SENSORS
+      if(/^thermocouples__ch\d$/.test(lc)) return false;
+      // Also exclude by substring for long d-prefixed sensor column names
+      if(SENSORS.some(s=>!s.m.startsWith('__')&&lc.includes(s.m.toLowerCase()))) return false;
+      if(f&&!lc.includes(f)) return false;
       return true;
     });
     if(raw.length){
