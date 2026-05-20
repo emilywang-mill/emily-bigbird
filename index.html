@@ -55,6 +55,25 @@ header .status .dot { width:6px; height:6px; border-radius:50%; background:var(-
 .pill.on { opacity:1; background:rgba(0,0,0,.04); }
 .pill:hover { opacity:.75; }
 
+/* ─ run stats panel ─ */
+#run-stats { display:none; margin-bottom:12px; }
+#run-stats.vis { display:block; }
+.stats-grid { display:flex; flex-wrap:wrap; gap:8px; }
+.stat-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:6px;
+  padding:10px 14px; min-width:140px; max-width:20%; flex:1 1 160px;
+}
+.stat-card-run {
+  font-size:9px; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--muted2); margin-bottom:6px; display:flex; align-items:center; gap:6px;
+}
+.stat-card-run .run-swatch { width:8px; height:8px; border-radius:1px; flex-shrink:0; }
+.stat-rows { display:flex; flex-direction:column; gap:4px; }
+.stat-row { display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+.stat-label { font-size:10px; color:var(--muted); }
+.stat-value { font-size:12px; font-weight:500; color:var(--text); font-family:var(--mono); text-align:right; }
+.stat-value.na { color:var(--muted2); font-weight:400; font-size:10px; }
+
 /* ─ controls bar ─ */
 .controls-bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
 .seg { display:flex; border:1px solid var(--border); border-radius:4px; overflow:hidden; background:var(--surf2); }
@@ -153,6 +172,10 @@ header .status .dot { width:6px; height:6px; border-radius:50%; background:var(-
     <div class="panel-label">Runs</div>
     <div class="run-pills" id="pills"><span style="color:var(--muted2)">discovering…</span></div>
   </div>
+</div>
+
+<div id="run-stats">
+  <div class="stats-grid" id="statsGrid"></div>
 </div>
 
 <div class="controls-bar">
@@ -268,7 +291,7 @@ const SENSORS = [
   // ── Temperature ─────────────────────────────────────────
   { m:'d403_blower_fan_inlet_temperature_1',      l:'Blower Fan Inlet Temp',      u:'°C',     g:'Temperature',        c:'#22d3ee' },
   { m:'d405_blower_inlet_temperature_2',          l:'Blower Inlet Temp',          u:'°C',     g:'Temperature',        c:'#164e63' },
-  { m:'d408_air_heater_outlet_temperature',       l:'Air Heater Outlet Temp',     u:'°C',     g:'Temperature',        c:'#0e7490' },
+  { m:'d408_air_heater_outlet_temperature',       l:'PV Inlet Temp',              u:'°C',     g:'Temperature',        c:'#0e7490' },
   { m:'d302_condenser_inlet_temperature',         l:'Condenser Inlet Temp',       u:'°C',     g:'Temperature',        c:'#be185d' },
   { m:'d304_condenser_outlet_temperature_1',      l:'Condenser Outlet Temp',      u:'°C',     g:'Temperature',        c:'#db2777' },
   { m:'d305_condenser_outlet_temperature_2',      l:'Condenser Outlet Temp 2',    u:'°C',     g:'Temperature',        c:'#f472b6' },
@@ -315,6 +338,7 @@ const RUN_COLORS = [
   '#5b21b6','#0e7490','#9d174d','#047857','#1d4ed8',
 ];
 
+let RUN_LABELS = {};  // runId → label string, loaded from run_labels.json
 let RUN_EVENTS = {
   '0407':[{ts:'2026-04-07 14:18:00',label:'120C, 50% PWM'},{ts:'2026-04-07 15:40:00',label:'120C, 70% PWM'},{ts:'2026-04-07 16:08:00',label:'120C, 25% PWM'},{ts:'2026-04-07 16:35:00',label:'150C, 50% PWM'},{ts:'2026-04-07 17:05:00',label:'150C, 25% PWM'},{ts:'2026-04-07 17:31:00',label:'180C, 25% PWM'}],
   '0409':[{ts:'2026-04-09 11:21:00',label:'Air heater on'},{ts:'2026-04-09 13:12:00',label:'180C, 22 CFM'}],
@@ -371,6 +395,19 @@ async function discoverRuns() {
       .forEach((n,i)=>{ if(!RUNS[n]) RUNS[n]={label:n,color:RUN_COLORS[i%RUN_COLORS.length]}; });
   }
   await tryLoadEvents();
+  tryLoadLabels();
+}
+
+async function tryLoadLabels() {
+  try {
+    const r=await fetch(`https://raw.githubusercontent.com/${REPO}/${BRANCH}/run_labels.json`);
+    if(!r.ok) return;
+    const obj=await r.json();
+    Object.assign(RUN_LABELS, obj);
+    // Re-render pills and stats now that labels are loaded
+    renderPills();
+    renderRunStats();
+  } catch {}
 }
 
 async function tryLoadEvents() {
@@ -599,7 +636,7 @@ function renderPills(){
   for(const[name,meta]of Object.entries(RUNS)){
     const btn=document.createElement('button');
     btn.className='pill'+(activeRuns.has(name)?' on':'');
-    btn.id='pill-'+name; btn.textContent=name;
+    btn.id='pill-'+name; btn.textContent=RUN_LABELS[name]?`${name} — ${RUN_LABELS[name]}`:name;
     btn.style.cssText=`border-color:${meta.color};color:${meta.color};`;
     btn.onclick=()=>toggleRun(name);
     el.appendChild(btn);
@@ -617,7 +654,7 @@ async function toggleRun(name){
     }
     pill.classList.add('on');
   }
-  rebuildAll();
+  rebuildAll(); renderRunStats();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -860,6 +897,92 @@ function buildSingleChart(plotId,m){
   });
   chartInstances[plotId]=chart;
   updateLegend(plotId,m);
+}
+
+function renderRunStats(){
+  const grid=document.getElementById('statsGrid');
+  const statsEl=document.getElementById('run-stats');
+  if(!activeRuns.size){ statsEl.classList.remove('vis'); grid.innerHTML=''; return; }
+  statsEl.classList.add('vis');
+  grid.innerHTML='';
+
+  activeRuns.forEach(runName=>{
+    const d=datasets[runName];
+    if(!d) return;
+    const color=(RUNS[runName]&&RUNS[runName].color)||'#888';
+
+    // ── Run time: span of tHrOil (raw elapsed hours, unaligned) ────────────
+    let runHours=null;
+    if(d.tHrOil&&d.tHrOil.length>=2){
+      const valid=d.tHrOil.filter(v=>v!=null&&!isNaN(v));
+      if(valid.length>=2) runHours=valid[valid.length-1]-valid[0];
+    }
+
+    // ── Total kWh: walk kWh cols, sum value at each bin transition ──────────
+    // Cols are forward-filled in 20-min bins; a new bin starts when total row
+    // value changes from the previous row. Sum one value per distinct bin.
+    const KWH_COLS=['motor_kwh','oil_kwh','cooling_kwh','blower_kwh','air_kwh'];
+    let totalKwh=null;
+    const kwhArrs=KWH_COLS.map(k=>{const c=resolveCol(d.headers,k);return c?d.channels[c]:null;}).filter(Boolean);
+    if(kwhArrs.length){
+      const n=kwhArrs[0].length;
+      let sum=0, prevTotal=null;
+      for(let i=0;i<n;i++){
+        const rowTotal=kwhArrs.reduce((s,arr)=>s+(arr[i]||0),0);
+        if(rowTotal>0 && rowTotal!==prevTotal){ sum+=rowTotal; prevTotal=rowTotal; }
+      }
+      if(sum>0) totalKwh=sum;
+    }
+
+    // ── Water removed: max of cumWaterKg (already integrated from dry rate) ─
+    let waterKg=null;
+    if(d.cumWaterKg&&d.cumWaterKg.length){
+      const mx=Math.max(...d.cumWaterKg);
+      if(mx>0.01) waterKg=mx;
+    }
+
+    // ── Avg kWh/kg ──────────────────────────────────────────────────────────
+    let avgKwhKg=null;
+    if(totalKwh!=null&&waterKg!=null&&waterKg>0.01) avgKwhKg=totalKwh/waterKg;
+
+    // ── Avg kW: total kWh / run time in hours ───────────────────────────────
+    let avgKw=null;
+    if(totalKwh!=null&&runHours!=null&&runHours>0) avgKw=totalKwh/runHours;
+
+    // ── Render card ─────────────────────────────────────────────────────────
+    const fv=(v,dec,u)=>v!=null?`${v.toFixed(dec)} ${u}`:'—';
+    const na=(v)=>v==null?' na':'';
+    const card=document.createElement('div');
+    card.className='stat-card';
+    card.innerHTML=`
+      <div class="stat-card-run">
+        <span class="run-swatch" style="background:${color}"></span>
+        <span>${runName}${RUN_LABELS[runName]?' <span style="font-weight:400;opacity:.7">— '+RUN_LABELS[runName]+'</span>':''}</span>
+      </div>
+      <div class="stat-rows">
+        <div class="stat-row">
+          <span class="stat-label">Run time</span>
+          <span class="stat-value${na(runHours)}">${fv(runHours,1,'h')}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Total kWh</span>
+          <span class="stat-value${na(totalKwh)}">${fv(totalKwh,2,'kWh')}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Water removed</span>
+          <span class="stat-value${na(waterKg)}">${fv(waterKg,2,'kg')}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Avg kWh/kg</span>
+          <span class="stat-value${na(avgKwhKg)}">${fv(avgKwhKg,2,'kWh/kg')}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Avg kW</span>
+          <span class="stat-value${na(avgKw)}">${fv(avgKw,2,'kW')}</span>
+        </div>
+      </div>`;
+    grid.appendChild(card);
+  });
 }
 
 function setYOverride(plotId){
@@ -1147,7 +1270,7 @@ async function init(){
   if(!activeRuns.size) Object.keys(RUNS).slice(0,2).forEach(n=>activeRuns.add(n));
   renderPills();
   document.getElementById('initLoading').remove();
-  renderAllPlots(); renderChipStrip();
+  renderAllPlots(); renderChipStrip(); renderRunStats();
   document.getElementById('statusText').textContent='loading data…';
   await Promise.all([...activeRuns].map(n=>loadRun(n).catch(()=>activeRuns.delete(n))));
   rebuildAll(); renderChipStrip();
