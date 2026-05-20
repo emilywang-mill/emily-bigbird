@@ -126,7 +126,7 @@ header .status .dot { width:6px; height:6px; border-radius:50%; background:var(-
 .chart-row-title { font-family:var(--ui); font-size:11px; font-weight:500; color:var(--muted); letter-spacing:.03em; }
 .chart-row-remove { margin-left:auto; background:none; border:none; color:var(--muted2); cursor:pointer; font-size:14px; line-height:1; padding:1px 4px; transition:color .1s; border-radius:3px; }
 .chart-row-remove:hover { color:var(--danger); }
-.chart-canvas-wrap { position:relative; height:210px; padding:6px 8px; cursor:crosshair; }
+.chart-canvas-wrap { position:relative; height:242px; padding:6px 8px; cursor:crosshair; }
 .chart-loading { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--muted2); background:var(--surface); z-index:2; pointer-events:none; }
 .chart-legend { display:flex; flex-wrap:wrap; gap:8px; padding:5px 12px 9px; }
 .legend-item { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--muted); }
@@ -636,7 +636,7 @@ function renderPills(){
   for(const[name,meta]of Object.entries(RUNS)){
     const btn=document.createElement('button');
     btn.className='pill'+(activeRuns.has(name)?' on':'');
-    btn.id='pill-'+name; btn.textContent=RUN_LABELS[name]?`${name} — ${RUN_LABELS[name]}`:name;
+    btn.id='pill-'+name; btn.textContent=name;
     btn.style.cssText=`border-color:${meta.color};color:${meta.color};`;
     btn.onclick=()=>toggleRun(name);
     el.appendChild(btn);
