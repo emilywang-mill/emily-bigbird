@@ -73,6 +73,9 @@ header .status .dot { width:6px; height:6px; border-radius:50%; background:var(-
 .stat-label { font-size:10px; color:var(--muted); }
 .stat-value { font-size:12px; font-weight:500; color:var(--text); font-family:var(--mono); text-align:right; }
 .stat-value.na { color:var(--muted2); font-weight:400; font-size:10px; }
+.stat-section-label { font-size:9px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted2); margin-top:4px; margin-bottom:2px; }
+.stat-divider { height:1px; background:var(--border); margin:6px 0 4px; }
 
 /* ─ controls bar ─ */
 .controls-bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
@@ -911,45 +914,69 @@ function renderRunStats(){
     if(!d) return;
     const color=(RUNS[runName]&&RUNS[runName].color)||'#888';
 
-    // ── Run time: span of tHrOil (raw elapsed hours, unaligned) ────────────
-    let runHours=null;
-    if(d.tHrOil&&d.tHrOil.length>=2){
-      const valid=d.tHrOil.filter(v=>v!=null&&!isNaN(v));
-      if(valid.length>=2) runHours=valid[valid.length-1]-valid[0];
+    // ── Find index where MC first hits ≤10% (cutoff for drying stats) ────────
+    const mcCol=resolveCol(d.headers,'predicted_mc_pct');
+    const mcArr=mcCol?d.channels[mcCol]:null;
+    const n=d.tHrOil.length;
+    let cutIdx=n-1; // default: use full run
+    let hitTarget=false;
+    if(mcArr){
+      for(let i=0;i<n;i++){
+        if(mcArr[i]!=null&&!isNaN(mcArr[i])&&mcArr[i]<=10){
+          cutIdx=i; hitTarget=true; break;
+        }
+      }
     }
 
-    // ── Total kWh: walk kWh cols, sum value at each bin transition ──────────
-    // Cols are forward-filled in 20-min bins; a new bin starts when total row
-    // value changes from the previous row. Sum one value per distinct bin.
+    // ── Run time: start → 10% MC (or full run) ───────────────────────────────
+    let runHours=null;
+    {
+      const tArr=d.tHrOil;
+      const t0=tArr.find(v=>v!=null&&!isNaN(v));
+      const t1=tArr[cutIdx];
+      if(t0!=null&&t1!=null) runHours=t1-t0;
+    }
+
+    // ── Total kWh within cutoff: bin-transition sum up to cutIdx ─────────────
     const KWH_COLS=['motor_kwh','oil_kwh','cooling_kwh','blower_kwh','air_kwh'];
     let totalKwh=null;
     const kwhArrs=KWH_COLS.map(k=>{const c=resolveCol(d.headers,k);return c?d.channels[c]:null;}).filter(Boolean);
     if(kwhArrs.length){
-      const n=kwhArrs[0].length;
       let sum=0, prevTotal=null;
-      for(let i=0;i<n;i++){
+      for(let i=0;i<=cutIdx;i++){
         const rowTotal=kwhArrs.reduce((s,arr)=>s+(arr[i]||0),0);
-        if(rowTotal>0 && rowTotal!==prevTotal){ sum+=rowTotal; prevTotal=rowTotal; }
+        if(rowTotal>0&&rowTotal!==prevTotal){sum+=rowTotal;prevTotal=rowTotal;}
       }
       if(sum>0) totalKwh=sum;
     }
 
-    // ── Water removed: max of cumWaterKg (already integrated from dry rate) ─
+    // ── Water removed: max of cumWaterKg over entire run ─────────────────────
     let waterKg=null;
     if(d.cumWaterKg&&d.cumWaterKg.length){
       const mx=Math.max(...d.cumWaterKg);
       if(mx>0.01) waterKg=mx;
     }
 
-    // ── Avg kWh/kg ──────────────────────────────────────────────────────────
+    // ── Avg kWh/kg (uses kWh up to cutoff / total water removed) ─────────────
     let avgKwhKg=null;
     if(totalKwh!=null&&waterKg!=null&&waterKg>0.01) avgKwhKg=totalKwh/waterKg;
 
-    // ── Avg kW: total kWh / run time in hours ───────────────────────────────
+    // ── Avg kW ────────────────────────────────────────────────────────────────
     let avgKw=null;
     if(totalKwh!=null&&runHours!=null&&runHours>0) avgKw=totalKwh/runHours;
 
-    // ── Render card ─────────────────────────────────────────────────────────
+    // ── End MC%: last non-null MC value in full run ───────────────────────────
+    let endMc=null;
+    if(mcArr){
+      for(let i=n-1;i>=0;i--){
+        if(mcArr[i]!=null&&!isNaN(mcArr[i])&&mcArr[i]>0){endMc=mcArr[i];break;}
+      }
+    }
+
+    // ── Cutoff label ─────────────────────────────────────────────────────────
+    const cutLabel=hitTarget?'Start → 10% MC':'Start → End (MC never hit 10%)';
+
+    // ── Render card ──────────────────────────────────────────────────────────
     const fv=(v,dec,u)=>v!=null?`${v.toFixed(dec)} ${u}`:'—';
     const na=(v)=>v==null?' na':'';
     const card=document.createElement('div');
@@ -960,6 +987,7 @@ function renderRunStats(){
         <span>${runName}${RUN_LABELS[runName]?' <span style="font-weight:400;opacity:.7">— '+RUN_LABELS[runName]+'</span>':''}</span>
       </div>
       <div class="stat-rows">
+        <div class="stat-section-label">${cutLabel}</div>
         <div class="stat-row">
           <span class="stat-label">Run time</span>
           <span class="stat-value${na(runHours)}">${fv(runHours,1,'h')}</span>
@@ -969,16 +997,22 @@ function renderRunStats(){
           <span class="stat-value${na(totalKwh)}">${fv(totalKwh,2,'kWh')}</span>
         </div>
         <div class="stat-row">
-          <span class="stat-label">Water removed</span>
-          <span class="stat-value${na(waterKg)}">${fv(waterKg,2,'kg')}</span>
-        </div>
-        <div class="stat-row">
           <span class="stat-label">Avg kWh/kg</span>
           <span class="stat-value${na(avgKwhKg)}">${fv(avgKwhKg,2,'kWh/kg')}</span>
         </div>
         <div class="stat-row">
           <span class="stat-label">Avg kW</span>
           <span class="stat-value${na(avgKw)}">${fv(avgKw,2,'kW')}</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-section-label">Full run</div>
+        <div class="stat-row">
+          <span class="stat-label">Water removed</span>
+          <span class="stat-value${na(waterKg)}">${fv(waterKg,2,'kg')}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">End MC</span>
+          <span class="stat-value${na(endMc)}">${fv(endMc,1,'%')}</span>
         </div>
       </div>`;
     grid.appendChild(card);
