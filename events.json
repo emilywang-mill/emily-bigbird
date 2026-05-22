@@ -129,5 +129,26 @@
     {"timestamp": "2026-05-13 12:15:00", "label": "Dew Point, Air 100% PWM (45 CFM)"},
     {"timestamp": "2026-05-13 14:16:00", "label": "Oil Ramp"},
     {"timestamp": "2026-05-13 17:16:00", "label": "CD start"}
+  ],
+  "0514": [
+    {"timestamp": "2026-05-14 08:39:00", "label": "DGO start"},
+    {"timestamp": "2026-05-14 13:39:00", "label": "2nd phase (lower heat, higher flow, oil ramp)"},
+    {"timestamp": "2026-05-14 17:39:00", "label": "CD start"}
+  ],
+  "0519": [
+    {"timestamp": "2026-05-19 08:26:00", "label": "DGO start"},
+    {"timestamp": "2026-05-19 17:32:00", "label": "CD start"}
+  ],
+  "0520": [
+    {"timestamp": "2026-05-20 08:58:00", "label": "DGO start"},
+    {"timestamp": "2026-05-20 19:01:00", "label": "CD start"}
+  ],
+  "0521": [
+    {"timestamp": "2026-05-21 08:51:00", "label": "DGO start"},
+    {"timestamp": "2026-05-21 09:14:00", "label": "Air 40% PWM"},
+    {"timestamp": "2026-05-21 09:36:00", "label": "Air 50% PWM"},
+    {"timestamp": "2026-05-21 10:00:00", "label": "Air 43% (20 CFM)"},
+    {"timestamp": "2026-05-21 13:32:00", "label": "2nd stage DGO (Air 120 C, 73% PWM)"},
+    {"timestamp": "2026-05-21 18:29:00", "label": "CD start"}
   ]
 }
