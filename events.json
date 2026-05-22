@@ -1,5 +1,6 @@
 {
   "0407": [
+    {"timestamp": "2026-04-07 14:18:00", "label": "DGO start"},
     {"timestamp": "2026-04-07 14:18:00", "label": "120C, 50% PWM"},
     {"timestamp": "2026-04-07 15:40:00", "label": "120C, 70% PWM"},
     {"timestamp": "2026-04-07 16:08:00", "label": "120C, 25% PWM"},
@@ -8,19 +9,29 @@
     {"timestamp": "2026-04-07 17:31:00", "label": "180C, 25% PWM"}
   ],
   "0409": [
+    {"timestamp": "2026-04-09 11:21:00", "label": "DGO start"},
     {"timestamp": "2026-04-09 11:21:00", "label": "Air heater on"},
-    {"timestamp": "2026-04-09 13:12:00", "label": "180C, 22 CFM"}
+    {"timestamp": "2026-04-09 13:12:00", "label": "180C, 22 CFM"},
+    {"timestamp": "2026-04-09 19:00:00", "label": "CD start"}
   ],
   "0416": [
+    {"timestamp": "2026-04-16 08:46:00", "label": "DGO start"},
     {"timestamp": "2026-04-16 10:35:00", "label": "120C, 70% PWM"},
     {"timestamp": "2026-04-16 11:05:00", "label": "120C, 30% PWM"},
     {"timestamp": "2026-04-16 11:46:00", "label": "150C, 30% PWM"},
     {"timestamp": "2026-04-16 12:33:00", "label": "130C, 70% PWM"},
     {"timestamp": "2026-04-16 14:40:00", "label": "CD Start 185->120C"},
     {"timestamp": "2026-04-16 15:31:00", "label": "Oil 120C"},
-    {"timestamp": "2026-04-16 16:11:00", "label": "CD Start 120->60C"}
+    {"timestamp": "2026-04-16 16:11:00", "label": "CD Start 120->60C"},
+    {"timestamp": "2026-04-16 17:21:00", "label": "CD start"}
+  ],
+  "0420": [
+    {"timestamp": "2026-04-20 09:12:00", "label": "180C, 22 CFM"},
+    {"timestamp": "2026-04-20 09:01:00", "label": "DGO start"},
+    {"timestamp": "2026-04-20 17:30:00", "label": "CD start"}
   ],
   "0423": [
+    {"timestamp": "2026-04-23 08:43:00", "label": "DGO start"},
     {"timestamp": "2026-04-23 11:48:00", "label": "24, 90/30/270"},
     {"timestamp": "2026-04-23 12:16:00", "label": "24, 30/30/330"},
     {"timestamp": "2026-04-23 12:45:00", "label": "24, 30/5/330"},
@@ -28,24 +39,30 @@
     {"timestamp": "2026-04-23 13:51:00", "label": "30, 270/5/90"},
     {"timestamp": "2026-04-23 14:25:00", "label": "24, 90/30/270"},
     {"timestamp": "2026-04-23 15:11:00", "label": "24, 1/1/1000"},
-    {"timestamp": "2026-04-23 15:45:00", "label": "34, 1/1/1000"}
+    {"timestamp": "2026-04-23 15:45:00", "label": "34, 1/1/1000"},
+    {"timestamp": "2026-04-23 17:47:00", "label": "CD start"}
   ],
   "0428": [
     {"timestamp": "2026-04-28 09:52:00", "label": "200 C, 15% PWM (13 CFM) - Bimetallic trip"},
     {"timestamp": "2026-04-28 10:33:00", "label": "180 C, 20% PWM (7 CFM) - Bimetallic trip"},
     {"timestamp": "2026-04-28 11:42:00", "label": "180 C, 25% PWM (11 CFM) - Bimetallic trip"},
-    {"timestamp": "2026-04-28 11:48:00", "label": "180 C, 80% PWM (39 CFM)"}
+    {"timestamp": "2026-04-28 11:51:00", "label": "DGO start"},
+    {"timestamp": "2026-04-28 11:48:00", "label": "180 C, 80% PWM (39 CFM)"},
+    {"timestamp": "2026-04-28 18:00:00", "label": "CD start"}
   ],
   "0504": [
+    {"timestamp": "2026-05-04 08:48:00", "label": "DGO start"},
     {"timestamp": "2026-05-04 13:50:00", "label": "Tempering Start - Heaters Off"},
     {"timestamp": "2026-05-04 14:20:00", "label": "Tempering End"},
-    {"timestamp": "2026-05-04 18:47:00", "label": "CD"}
+    {"timestamp": "2026-05-04 18:47:00", "label": "CD start"}
   ],
   "0505": [
+    {"timestamp": "2026-05-05 08:43:00", "label": "DGO start"},
     {"timestamp": "2026-05-05 13:43:00", "label": "Oil ramp down start"},
-    {"timestamp": "2026-05-05 18:19:00", "label": "CD"}
+    {"timestamp": "2026-05-05 18:19:00", "label": "CD start"}
   ],
   "0506": [
+    {"timestamp": "2026-05-06 08:09:00", "label": "DGO start"},
     {"timestamp": "2026-05-06 12:16:00", "label": "Bimetallic trip"},
     {"timestamp": "2026-05-06 12:42:00", "label": "35% PWM (20 CFM)"},
     {"timestamp": "2026-05-06 12:57:00", "label": "50% PWM (30 CFM)"},
@@ -61,9 +78,10 @@
     {"timestamp": "2026-05-06 15:27:00", "label": "50% PWM (30 CFM)"},
     {"timestamp": "2026-05-06 15:42:00", "label": "35% PWM (20 CFM)"},
     {"timestamp": "2026-05-06 15:55:00", "label": "50% PWM (30 CFM)"},
-    {"timestamp": "2026-05-06 17:15:00", "label": "CD"}
+    {"timestamp": "2026-05-06 17:15:00", "label": "CD start"}
   ],
   "0507": [
+    {"timestamp": "2026-05-07 08:26:00", "label": "DGO start"},
     {"timestamp": "2026-05-07 12:03:00", "label": "Air 160 C"},
     {"timestamp": "2026-05-07 12:33:00", "label": "Air 180 C"},
     {"timestamp": "2026-05-07 13:03:00", "label": "Air 160 C"},
@@ -72,9 +90,10 @@
     {"timestamp": "2026-05-07 14:33:00", "label": "Air 180 C"},
     {"timestamp": "2026-05-07 15:03:00", "label": "Air 160 C"},
     {"timestamp": "2026-05-07 15:39:00", "label": "Errors post"},
-    {"timestamp": "2026-05-07 18:02:00", "label": "CD"}
+    {"timestamp": "2026-05-07 18:02:00", "label": "CD start"}
   ],
   "0511": [
+    {"timestamp": "2026-05-11 12:18:00", "label": "DGO start"},
     {"timestamp": "2026-05-11 12:18:00", "label": "Dew Point, Air 100% PWM (45 CFM)"},
     {"timestamp": "2026-05-11 12:38:00", "label": "70% PWM (30 CFM)"},
     {"timestamp": "2026-05-11 12:58:00", "label": "100% PWM (45 CFM)"},
@@ -96,17 +115,19 @@
     {"timestamp": "2026-05-11 18:18:00", "label": "100% PWM (45 CFM)"},
     {"timestamp": "2026-05-11 18:38:00", "label": "70% PWM (30 CFM)"},
     {"timestamp": "2026-05-11 18:58:00", "label": "100% PWM (45 CFM)"},
-    {"timestamp": "2026-05-11 18:30:00", "label": "CD"}
+    {"timestamp": "2026-05-11 18:30:00", "label": "CD start"}
   ],
   "0512": [
+    {"timestamp": "2026-05-12 12:30:00", "label": "DGO start"},
     {"timestamp": "2026-05-12 12:30:00", "label": "Dew Point, Air 100% PWM (45 CFM)"},
     {"timestamp": "2026-05-12 14:17:00", "label": "pi reboot"},
     {"timestamp": "2026-05-12 15:22:00", "label": "Oil Ramp"},
-    {"timestamp": "2026-05-12 17:00:00", "label": "CD"}
+    {"timestamp": "2026-05-12 17:00:00", "label": "CD start"}
   ],
   "0513": [
+    {"timestamp": "2026-05-13 12:15:00", "label": "DGO start"},
     {"timestamp": "2026-05-13 12:15:00", "label": "Dew Point, Air 100% PWM (45 CFM)"},
     {"timestamp": "2026-05-13 14:16:00", "label": "Oil Ramp"},
-    {"timestamp": "2026-05-13 17:16:00", "label": "CD"}
+    {"timestamp": "2026-05-13 17:16:00", "label": "CD start"}
   ]
 }
