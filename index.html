@@ -257,14 +257,15 @@ const SENSORS = [
   { m:'dry_rate_g_min',   l:'Dry Rate',          u:'g/min',  g:'Derived', c:'#1a6e3c', derived:true },
   { m:'predicted_mc_pct', l:'Estimated MC',       u:'%',      g:'Derived', c:'#059669', derived:true },
   { m:'__airflow__',      l:'Estimated Airflow',  u:'CFM',    g:'Derived', c:'#0284c7', derived:true },
-  { m:'total_kwh_per_kg', l:'Total kWh/kg',       u:'kWh/kg', g:'Derived', c:'#b45309', derived:true },
+  { m:'__kwh_per_kg__',   l:'kWh/kg',             u:'kWh/kg', g:'Derived', c:'#b45309', derived:true },
   // ── Energy (kWh per subsystem, from exporter) ────────────
   { m:'motor_kwh',   l:'Motor kWh',      u:'kWh', g:'Energy', c:'#1d4ed8' },
   { m:'oil_kwh',     l:'Oil Heater kWh', u:'kWh', g:'Energy', c:'#8b5cf6' },
   { m:'cooling_kwh', l:'Condenser kWh',  u:'kWh', g:'Energy', c:'#db2777' },
   { m:'blower_kwh',  l:'Blower kWh',     u:'kWh', g:'Energy', c:'#064e3b' },
   { m:'air_kwh',     l:'Air Heater kWh', u:'kWh', g:'Energy', c:'#f59e0b' },
-  { m:'__total_kwh__', l:'Total kWh',      u:'kWh', g:'Energy', c:'#111827', derived:true },
+  { m:'__total_kwh__', l:'Energy Consumption', u:'kWh (20 min bins)', g:'Energy', c:'#111827', derived:true },
+  { m:'__power_kw__',  l:'Power Consumption',  u:'kW',               g:'Energy', c:'#374151', derived:true },
   // ── Process Vessel ──────────────────────────────────────
   { m:'mass_g',                                   l:'Mass',                       u:'g',      g:'Process Vessel',     c:'#3a9e5c' },
   { m:'d208_jacket_oil_temperature',              l:'Oil Temp',                   u:'°C',     g:'Process Vessel',     c:'#d4700a' },
@@ -616,7 +617,8 @@ function getVals(runName,m){
   const d=datasets[runName]; if(!d) return null;
   if(m==='__airflow__') return computeAirflow(d);
   if(m==='__total_current__'){
-    const cols=[0,1,2,3,4,5,6,7].map(i=>resolveCol(d.headers,`current__ch${i}_rms`)).filter(Boolean);
+    // Only sum ch2 (PV), ch4 (condenser), ch5 (air box)
+    const cols=[2,4,5].map(i=>resolveCol(d.headers,`current__ch${i}_rms`)).filter(Boolean);
     if(!cols.length) return null;
     const n=d.channels[cols[0]].length;
     return Array.from({length:n},(_,i)=>cols.reduce((s,c)=>s+(d.channels[c][i]||0),0));
@@ -626,6 +628,45 @@ function getVals(runName,m){
     if(!cols.length) return null;
     const n=d.channels[cols[0]].length;
     return Array.from({length:n},(_,i)=>cols.reduce((s,c)=>s+(d.channels[c][i]||0),0));
+  }
+  if(m==='__power_kw__'){
+    // kW = total_kWh_per_20min_bin / (20min / 60) = total_kWh * 3
+    const cols=['motor_kwh','oil_kwh','cooling_kwh','blower_kwh','air_kwh'].map(k=>resolveCol(d.headers,k)).filter(Boolean);
+    if(!cols.length) return null;
+    const n=d.channels[cols[0]].length;
+    return Array.from({length:n},(_,i)=>cols.reduce((s,c)=>s+(d.channels[c][i]||0),0)*3);
+  }
+  if(m==='__kwh_per_kg__'){
+    // kWh/kg per bin: same 20-min bins as energy consumption
+    // numerator  = total kWh in that bin (sum of kWh cols — forward-filled, so use value at bin start)
+    // denominator = cumWaterKg[bin_end] - cumWaterKg[bin_start] (water removed during the bin)
+    // Bins are detected by value-change transitions in the kWh cols (same logic as stat card)
+    const kwhCols=['motor_kwh','oil_kwh','cooling_kwh','blower_kwh','air_kwh']
+      .map(k=>resolveCol(d.headers,k)).filter(Boolean);
+    const wtr=d.cumWaterKg;  // kg, cumulative from dry rate integral
+    if(!kwhCols.length||!wtr||!wtr.length) return null;
+    const n=kwhCols[0]?d.channels[kwhCols[0]].length:0;
+    if(!n) return null;
+    const result=new Array(n).fill(NaN);
+    // Walk forward: a new bin starts whenever the summed kWh value changes
+    let binStart=0;
+    let prevTotal=null;
+    for(let i=0;i<n;i++){
+      const rowTotal=kwhCols.reduce((s,c)=>s+(d.channels[c][i]||0),0);
+      const isNewBin=(prevTotal!==null&&Math.abs(rowTotal-prevTotal)>1e-9&&rowTotal>0);
+      const isLast=(i===n-1);
+      if((isNewBin||isLast)&&prevTotal!==null&&prevTotal>0){
+        const binEnd=isNewBin?i-1:i;
+        const dmass=Math.max(0,(wtr[binEnd]||0)-(wtr[binStart]||0));
+        const ratio=dmass>0.005?prevTotal/dmass:NaN;
+        // fill entire bin with this ratio
+        for(let j=binStart;j<=binEnd;j++) result[j]=ratio;
+        binStart=i;
+      }
+      if(rowTotal>0) prevTotal=rowTotal;
+      else if(prevTotal===null) prevTotal=0;
+    }
+    return result;
   }
   const col=resolveCol(d.headers,m); if(!col) return null;
   return d.channels[col];
