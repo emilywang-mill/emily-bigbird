@@ -1,0 +1,412 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-mono); font-size: 12px; }
+.app { padding: 1rem 0; }
+.section-label { font-size: 9px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--color-text-tertiary); margin-bottom: 6px; }
+.card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 14px 16px; margin-bottom: 12px; }
+.pill-group { display: flex; flex-wrap: wrap; gap: 4px; }
+.pill { padding: 3px 9px; border-radius: 20px; border: 0.5px solid var(--color-border-secondary); font-family: var(--font-mono); font-size: 11px; cursor: pointer; color: var(--color-text-secondary); background: transparent; transition: all .12s; }
+.pill.on { background: #1a6e3c; color: #fff; border-color: #1a6e3c; }
+.pill:hover:not(.on) { color: var(--color-text-primary); border-color: var(--color-text-primary); }
+.ctrl-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.param-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.param-item { display: flex; flex-direction: column; gap: 3px; }
+.param-item label { font-size: 10px; color: var(--color-text-tertiary); }
+.param-item input[type=number] { font-family: var(--font-mono); font-size: 12px; padding: 5px 8px; background: var(--color-background-secondary); color: var(--color-text-primary); border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); width: 100%; }
+select { font-family: var(--font-mono); font-size: 11px; padding: 4px 8px; background: var(--color-background-primary); color: var(--color-text-primary); border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); cursor: pointer; }
+.btn { font-family: var(--font-mono); font-size: 11px; padding: 5px 14px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: transparent; color: var(--color-text-secondary); cursor: pointer; transition: all .12s; }
+.btn:hover { color: var(--color-text-primary); border-color: var(--color-text-primary); }
+.btn.primary { background: #1a6e3c; color: #fff; border-color: #1a6e3c; font-weight: 500; }
+.btn.primary:hover { opacity: .88; }
+.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.metric { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 12px; }
+.metric .lbl { font-size: 10px; color: var(--color-text-tertiary); margin-bottom: 3px; }
+.metric .val { font-size: 17px; font-weight: 500; color: var(--color-text-primary); }
+.metric .sub { font-size: 10px; color: var(--color-text-secondary); margin-top: 2px; }
+.results-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.results-table th { text-align: left; padding: 6px 8px; font-size: 9px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-tertiary); border-bottom: 0.5px solid var(--color-border-tertiary); }
+.results-table td { padding: 6px 8px; border-bottom: 0.5px solid var(--color-border-tertiary); color: var(--color-text-primary); }
+.results-table tr:last-child td { border-bottom: none; }
+.results-table tr.best td { color: #1a6e3c; font-weight: 500; }
+.badge { display: inline-block; font-size: 9px; padding: 2px 6px; border-radius: 10px; background: #1a6e3c22; color: #1a6e3c; margin-left: 4px; }
+.chart-wrap { position: relative; width: 100%; height: 260px; }
+.status { font-size: 11px; color: var(--color-text-secondary); padding: 12px 0; text-align: center; }
+.params-box { font-size: 11px; color: var(--color-text-secondary); background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 12px; margin-top: 8px; line-height: 1.8; }
+.info-box { font-size: 11px; color: var(--color-text-secondary); background: var(--color-background-info); border: 0.5px solid var(--color-border-info); border-radius: var(--border-radius-md); padding: 10px 12px; margin-bottom: 10px; line-height: 1.7; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; font-size: 11px; color: var(--color-text-secondary); }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.trim-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.trim-row label { font-size: 11px; color: var(--color-text-secondary); display: flex; align-items: center; gap: 6px; }
+.trim-row input[type=range] { width: 80px; }
+.trim-row span { font-size: 11px; font-weight: 500; color: var(--color-text-primary); min-width: 28px; }
+.divider { border: none; border-top: 0.5px solid var(--color-border-tertiary); margin: 10px 0; }
+</style>
+
+<h2 class="sr-only">Drying model fitter — computes moisture ratio from cumulative water removed and fits thin-layer models.</h2>
+
+<div class="app">
+
+  <div class="card">
+    <div class="section-label">Select run</div>
+    <div id="runPills" class="pill-group"><span class="status">Loading runs…</span></div>
+  </div>
+
+  <div class="card" id="configCard" style="display:none">
+    <div class="section-label">Batch parameters</div>
+    <div class="info-box">
+      The scale reports <b>cumulative water removed</b> (g). Water remaining = M₀_water − removed.<br>
+      MR = (water_remaining − Mₑ) / (M₀_water − Mₑ) &nbsp;·&nbsp; Mₑ = water at end of run (or 0 to assume full dryout)
+    </div>
+    <div class="param-grid">
+      <div class="param-item"><label>Carrots loaded (kg)</label><input type="number" id="carrotsKg" value="40" step="0.5" min="0"></div>
+      <div class="param-item"><label>Carrots water fraction</label><input type="number" id="carrotWf" value="0.90" step="0.01" min="0" max="1"></div>
+      <div class="param-item"><label>FG loaded (kg)</label><input type="number" id="fgKg" value="4" step="0.5" min="0"></div>
+      <div class="param-item"><label>FG water fraction</label><input type="number" id="fgWf" value="0.10" step="0.01" min="0" max="1"></div>
+      <div class="param-item"><label>Mₑ method</label>
+        <select id="meSel">
+          <option value="end">End of run (last 5% of data)</option>
+          <option value="zero">Zero (assume full dryout)</option>
+          <option value="target">Target moisture content</option>
+        </select>
+      </div>
+      <div class="param-item" id="meTargetWrap" style="display:none"><label>Target MC (% wb)</label><input type="number" id="meTarget" value="5" step="0.5" min="0" max="100"></div>
+    </div>
+    <hr class="divider">
+    <div class="ctrl-row">
+      <label style="font-size:11px;color:var(--color-text-secondary)">Model:</label>
+      <select id="modelSel">
+        <option value="all">All models (compare)</option>
+        <option value="lewis">Lewis</option>
+        <option value="page">Page</option>
+        <option value="modpage">Modified Page</option>
+        <option value="log">Logarithmic</option>
+        <option value="midilli">Midilli</option>
+        <option value="twoterm">Two-term</option>
+        <option value="handpabis">Henderson-Pabis</option>
+        <option value="diffapp">Diffusion approach</option>
+      </select>
+      <label style="font-size:11px;color:var(--color-text-secondary)">Smooth:</label>
+      <select id="smoothSel">
+        <option value="1">Raw</option>
+        <option value="5">5 min</option>
+        <option value="10" selected>10 min</option>
+        <option value="20">20 min</option>
+      </select>
+    </div>
+    <div class="trim-row">
+      <label>Trim start: <input type="range" id="trimStart" min="0" max="60" value="0" step="5"> <span id="trimStartVal">0 min</span></label>
+      <label>Trim end: <input type="range" id="trimEnd" min="0" max="60" value="0" step="5"> <span id="trimEndVal">0 min</span></label>
+    </div>
+    <div style="margin-top:12px">
+      <button class="btn primary" onclick="runFit()">Fit models</button>
+    </div>
+  </div>
+
+  <div id="resultsArea"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const REPO='emilywang-mill/emily-bigbird', BRANCH='main';
+const BASE=`https://raw.githubusercontent.com/${REPO}/${BRANCH}/data/`;
+const API=`https://api.github.com/repos/${REPO}/contents`;
+const RUN_COLORS=['#1a6e3c','#1a4e8a','#c0392b','#d4700a','#7c3aed','#0891b2','#be185d','#065f46','#1e40af','#92400e'];
+
+let runs={}, loadedData={}, activeRun=null, fitChart=null, fitChart2=null;
+
+document.getElementById('meSel').addEventListener('change', e=>{
+  document.getElementById('meTargetWrap').style.display = e.target.value==='target' ? '' : 'none';
+});
+document.getElementById('trimStart').addEventListener('input',e=>document.getElementById('trimStartVal').textContent=e.target.value+' min');
+document.getElementById('trimEnd').addEventListener('input',e=>document.getElementById('trimEndVal').textContent=e.target.value+' min');
+
+async function init(){
+  try {
+    const r=await fetch(`${API}/data?ref=${BRANCH}`,{headers:{'Accept':'application/vnd.github.v3+json'}});
+    if(r.ok){
+      const files=await r.json();
+      files.filter(f=>f.name.endsWith('.csv')).forEach((f,i)=>{
+        const n=f.name.replace('.csv','');
+        runs[n]={label:n,color:RUN_COLORS[i%RUN_COLORS.length]};
+      });
+    } else throw 0;
+  } catch {
+    ['0302','0409','0416','0420','0421','0422','0423','0427','0428','0504','0505','0506','0507','0511','0512','0513','0514','0519','0520','0521']
+      .forEach((n,i)=>{runs[n]={label:n,color:RUN_COLORS[i%RUN_COLORS.length]};});
+  }
+  renderPills();
+}
+
+function renderPills(){
+  document.getElementById('runPills').innerHTML=Object.keys(runs).map(n=>
+    `<button class="pill${activeRun===n?' on':''}" onclick="selectRun('${n}')">${n}</button>`
+  ).join('');
+}
+
+async function selectRun(name){
+  activeRun=name;
+  renderPills();
+  document.getElementById('configCard').style.display='';
+  if(!loadedData[name]){
+    document.getElementById('resultsArea').innerHTML=`<div class="status">Loading ${name}.csv…</div>`;
+    try {
+      const r=await fetch(`${BASE}${name}.csv`);
+      const txt=await r.text();
+      const p=Papa.parse(txt,{header:true,dynamicTyping:true,skipEmptyLines:true});
+      loadedData[name]=p.data;
+      document.getElementById('resultsArea').innerHTML=`<div class="status">Loaded ${p.data.length} rows for run ${name}. Configure batch params and press Fit models.</div>`;
+    } catch {
+      document.getElementById('resultsArea').innerHTML=`<div class="status" style="color:var(--color-text-danger)">Failed to load ${name}.csv</div>`;
+    }
+  } else {
+    document.getElementById('resultsArea').innerHTML=`<div class="status">Run ${name} ready (${loadedData[name].length} rows). Press Fit models.</div>`;
+  }
+}
+
+function findCol(headers,...keys){
+  for(const k of keys){
+    const f=headers.find(h=>h&&h.toLowerCase().includes(k.toLowerCase()));
+    if(f) return f;
+  }
+  return null;
+}
+
+function rollingMean(arr,w){
+  return arr.map((_,i)=>{
+    const sl=arr.slice(Math.max(0,i-w+1),i+1).filter(v=>v!=null&&!isNaN(v));
+    return sl.length?sl.reduce((a,b)=>a+b,0)/sl.length:null;
+  });
+}
+
+function runFit(){
+  if(!activeRun||!loadedData[activeRun]) return;
+  const data=loadedData[activeRun];
+  const headers=Object.keys(data[0]);
+
+  const massCol=findCol(headers,'mass_g','mass');
+  if(!massCol){
+    document.getElementById('resultsArea').innerHTML=`<div class="status" style="color:var(--color-text-danger)">Could not find mass column in CSV. Headers: ${headers.slice(0,8).join(', ')}</div>`;
+    return;
+  }
+
+  // Batch params
+  const carrotsKg=parseFloat(document.getElementById('carrotsKg').value)||40;
+  const carrotWf=parseFloat(document.getElementById('carrotWf').value)||0.90;
+  const fgKg=parseFloat(document.getElementById('fgKg').value)||4;
+  const fgWf=parseFloat(document.getElementById('fgWf').value)||0.10;
+  const smooth=parseInt(document.getElementById('smoothSel').value);
+  const trimS=parseInt(document.getElementById('trimStart').value);
+  const trimE=parseInt(document.getElementById('trimEnd').value);
+  const meMethod=document.getElementById('meSel').value;
+  const meTargetPct=parseFloat(document.getElementById('meTarget').value)||5;
+
+  // M0_water: initial water in kg
+  const M0_water_kg = carrotsKg*carrotWf + fgKg*fgWf;
+  const dry_solids_kg = carrotsKg*(1-carrotWf) + fgKg*(1-fgWf);
+  const M0_water_g = M0_water_kg*1000;
+
+  // Pull mass_g (cumulative water removed in grams)
+  let rows=data.filter(r=>r[massCol]!=null&&!isNaN(r[massCol]));
+  if(rows.length<20){
+    document.getElementById('resultsArea').innerHTML=`<div class="status" style="color:var(--color-text-danger)">Not enough valid data rows (${rows.length}).</div>`;
+    return;
+  }
+
+  // Trim
+  const tS=Math.min(trimS, rows.length-10);
+  const tE=rows.length-Math.min(trimE, rows.length-10);
+  rows=rows.slice(tS,tE);
+  if(rows.length<15){
+    document.getElementById('resultsArea').innerHTML=`<div class="status" style="color:var(--color-text-danger)">Too few rows after trimming.</div>`;
+    return;
+  }
+
+  // Raw cumulative water removed [g], zero-anchored at run start
+  const rawRemoved=rows.map(r=>r[massCol]);
+  const removed0=rawRemoved[0]; // anchor: subtract first value so it starts at 0
+  const removedG=rawRemoved.map(v=>v-removed0);
+
+  // Smooth the removed series
+  const smoothedRemoved=rollingMean(removedG,smooth);
+
+  // Water remaining [g]
+  const waterRemaining=smoothedRemoved.map(r=>Math.max(0, M0_water_g - r));
+
+  // Determine Me [g of water]
+  let Me_g=0;
+  if(meMethod==='end'){
+    const endSlice=waterRemaining.slice(Math.floor(waterRemaining.length*0.95));
+    Me_g=endSlice.reduce((a,b)=>a+b,0)/endSlice.length;
+  } else if(meMethod==='target'){
+    const mc=meTargetPct/100;
+    const waterAtTarget=(mc*(dry_solids_kg*1000))/(1-mc);
+    Me_g=Math.max(0,waterAtTarget);
+  } else {
+    Me_g=0;
+  }
+
+  const M0_g=waterRemaining[0];
+
+  if(M0_g<=Me_g){
+    document.getElementById('resultsArea').innerHTML=`<div class="status" style="color:var(--color-text-danger)">M₀ (${M0_g.toFixed(0)}g) ≤ Mₑ (${Me_g.toFixed(0)}g) — adjust batch params or Mₑ method.</div>`;
+    return;
+  }
+
+  // MR = (water_remaining - Me) / (M0 - Me)
+  const t=waterRemaining.map((_,i)=>i);
+  const MR=waterRemaining.map(w=>Math.max(0.001, Math.min(1, (w-Me_g)/(M0_g-Me_g))));
+
+  const modelSel=document.getElementById('modelSel').value;
+  const results=fitModels(t,MR,modelSel);
+  renderResults(t,MR,waterRemaining,results,rows.length,M0_g,Me_g,M0_water_g,dry_solids_kg,activeRun);
+}
+
+// ── Model definitions ──────────────────────────────────────────────────────
+function fitModels(t,MR,which){
+  const models={
+    lewis:    {name:'Lewis',            fn:(t,p)=>Math.exp(-p[0]*t),                                          p0:[0.01],              labels:['k']},
+    page:     {name:'Page',             fn:(t,p)=>Math.exp(-p[0]*Math.pow(Math.max(0,t),p[1])),               p0:[0.005,1.1],         labels:['k','n']},
+    modpage:  {name:'Modified Page',    fn:(t,p)=>Math.pow(Math.max(0,Math.exp(-p[0]*t)),p[1]),               p0:[0.005,1.1],         labels:['k','n']},
+    log:      {name:'Logarithmic',      fn:(t,p)=>p[0]*Math.exp(-p[1]*t)+p[2],                               p0:[1.0,0.01,0.0],      labels:['a','k','c']},
+    midilli:  {name:'Midilli',          fn:(t,p)=>p[0]*Math.exp(-p[1]*Math.pow(Math.max(0,t),p[2]))+p[3]*t, p0:[1.0,0.005,1.1,0],   labels:['a','k','n','b']},
+    twoterm:  {name:'Two-term',         fn:(t,p)=>p[0]*Math.exp(-p[1]*t)+p[2]*Math.exp(-p[3]*t),            p0:[0.6,0.01,0.4,0.002],labels:['a','k₀','b','k₁']},
+    handpabis:{name:'Henderson-Pabis',  fn:(t,p)=>p[0]*Math.exp(-p[1]*t),                                    p0:[1.0,0.01],          labels:['a','k']},
+    diffapp:  {name:'Diffusion approach',fn:(t,p)=>p[0]*Math.exp(-p[1]*t)+(1-p[0])*Math.exp(-p[1]*p[2]*t), p0:[0.6,0.01,0.5],      labels:['a','k','b']},
+  };
+  const toFit=which==='all'?Object.keys(models):(models[which]?[which]:Object.keys(models));
+  const results=[];
+  for(const key of toFit){
+    const m=models[key];
+    try {
+      const popt=lmFit(t,MR,m.fn,m.p0);
+      const pred=t.map(ti=>Math.max(0,Math.min(1.05,m.fn(ti,popt))));
+      results.push({key,name:m.name,params:popt,labels:m.labels,pred,
+        r2:calcR2(MR,pred),rmse:calcRMSE(MR,pred),chi2:calcChi2(MR,pred,popt.length)});
+    } catch{}
+  }
+  results.sort((a,b)=>b.r2-a.r2);
+  return results;
+}
+
+function lmFit(t,y,fn,p0,iters=3000){
+  let p=[...p0], lr=0.002, prev=Infinity;
+  for(let i=0;i<iters;i++){
+    const pred=t.map(ti=>fn(ti,p));
+    const loss=y.reduce((s,yi,j)=>s+(yi-pred[j])**2,0);
+    if(Math.abs(prev-loss)<1e-13) break;
+    prev=loss;
+    const grad=p.map((_,pi)=>{
+      const h=Math.max(1e-7,Math.abs(p[pi])*1e-5);
+      const pp=[...p]; pp[pi]+=h;
+      const pm=[...p]; pm[pi]-=h;
+      return (y.reduce((s,yi,j)=>s+(yi-fn(t[j],pp))**2,0)-y.reduce((s,yi,j)=>s+(yi-fn(t[j],pm))**2,0))/(2*h);
+    });
+    const gnorm=Math.sqrt(grad.reduce((s,g)=>s+g*g,0));
+    const step=gnorm>0?lr/gnorm:lr;
+    p=p.map((pi,i)=>pi-step*grad[i]);
+    lr*=0.9998;
+  }
+  return p;
+}
+
+function calcR2(a,p){const m=a.reduce((s,v)=>s+v,0)/a.length;const sst=a.reduce((s,v)=>s+(v-m)**2,0);const ssr=a.reduce((s,v,i)=>s+(v-p[i])**2,0);return sst>0?1-ssr/sst:0;}
+function calcRMSE(a,p){return Math.sqrt(a.reduce((s,v,i)=>s+(v-p[i])**2,0)/a.length);}
+function calcChi2(a,p,np){const dof=Math.max(1,a.length-np);return a.reduce((s,v,i)=>s+(v-p[i])**2/Math.max(0.0001,p[i]),0)/dof;}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function renderResults(t,MR,waterRem,results,nRows,M0_g,Me_g,M0_water_g,dry_solids_kg,runName){
+  if(!results.length){
+    document.getElementById('resultsArea').innerHTML=`<div class="status" style="color:var(--color-text-danger)">All model fits failed — check data.</div>`;
+    return;
+  }
+  const best=results[0];
+  const color=runs[runName]?.color||'#1a6e3c';
+  const finalMC=waterRem[waterRem.length-1]/(waterRem[waterRem.length-1]+dry_solids_kg*1000)*100;
+  const paramStr=best.params.map((v,i)=>`<b>${best.labels[i]}</b> = ${v.toFixed(5)}`).join(' &nbsp;·&nbsp; ');
+
+  const tableRows=results.map((r,idx)=>`
+    <tr class="${idx===0?'best':''}">
+      <td>${r.name}${idx===0?'<span class="badge">best fit</span>':''}</td>
+      <td>${r.r2.toFixed(4)}</td>
+      <td>${r.rmse.toFixed(5)}</td>
+      <td>${r.chi2.toFixed(6)}</td>
+      <td style="color:var(--color-text-secondary);font-size:10px">${r.params.map((v,i)=>r.labels[i]+'='+v.toFixed(4)).join(', ')}</td>
+    </tr>`).join('');
+
+  document.getElementById('resultsArea').innerHTML=`
+    <div class="card">
+      <div class="section-label">Mass balance — run ${runName}</div>
+      <div class="metrics-grid">
+        <div class="metric"><div class="lbl">M₀ water</div><div class="val">${(M0_water_g/1000).toFixed(2)} kg</div><div class="sub">from batch params</div></div>
+        <div class="metric"><div class="lbl">Water removed</div><div class="val">${((M0_water_g-waterRem[waterRem.length-1])/1000).toFixed(2)} kg</div><div class="sub">by end of run</div></div>
+        <div class="metric"><div class="lbl">Mₑ (equil.)</div><div class="val">${(Me_g/1000).toFixed(2)} kg</div><div class="sub">water remaining at eq.</div></div>
+        <div class="metric"><div class="lbl">Final MC</div><div class="val">${finalMC.toFixed(1)}%</div><div class="sub">wet basis</div></div>
+        <div class="metric"><div class="lbl">Best model</div><div class="val" style="font-size:13px">${best.name}</div></div>
+        <div class="metric"><div class="lbl">R²</div><div class="val">${best.r2.toFixed(4)}</div><div class="sub">↑ target ≥0.99</div></div>
+      </div>
+      <div class="params-box">Best fit: ${paramStr}</div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">Moisture ratio — observed vs model</div>
+      <div class="legend">
+        <span class="legend-item"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};opacity:.5"></span> Observed MR</span>
+        <span class="legend-item"><span style="display:inline-block;width:18px;height:2px;background:${color}"></span> ${best.name}</span>
+        ${results.slice(1,4).map(r=>`<span class="legend-item"><span style="display:inline-block;width:18px;height:1px;background:#aaa9a0;border-top:1px dashed #aaa9a0"></span> ${r.name}</span>`).join('')}
+      </div>
+      <div class="chart-wrap"><canvas id="mrChart" role="img" aria-label="Moisture ratio over time with fitted model curves for run ${runName}">Moisture ratio decay from 1 to near 0 over the drying run.</canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">Water remaining (kg)</div>
+      <div class="chart-wrap"><canvas id="waterChart" role="img" aria-label="Water remaining in kg over time">Water remaining in the vessel decreasing over the drying run.</canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">Model comparison</div>
+      <table class="results-table">
+        <thead><tr><th>Model</th><th>R²</th><th>RMSE</th><th>χ²</th><th>Parameters</th></tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>`;
+
+  const stride=Math.max(1,Math.floor(t.length/100));
+  const tThin=t.filter((_,i)=>i%stride===0);
+  const MRthin=MR.filter((_,i)=>i%stride===0);
+  const waterThin=waterRem.filter((_,i)=>i%stride===0).map(v=>parseFloat((v/1000).toFixed(3)));
+
+  if(fitChart){fitChart.destroy();fitChart=null;}
+  if(fitChart2){fitChart2.destroy();fitChart2=null;}
+
+  const mrDatasets=[
+    {label:'Observed MR',data:tThin.map((ti,i)=>({x:ti,y:parseFloat(MRthin[i].toFixed(4))})),
+      type:'scatter',pointRadius:2,pointBackgroundColor:color+'88',showLine:false,order:2},
+    {label:best.name,data:tThin.map((ti)=>({x:ti,y:parseFloat(Math.max(0,best.fn?best.fn(ti,best.params):best.pred[Math.min(ti,best.pred.length-1)]).toFixed(4))})),
+      type:'line',borderColor:color,borderWidth:2,pointRadius:0,fill:false,order:1}
+  ];
+
+  results.slice(1,4).forEach(r=>{
+    mrDatasets.push({label:r.name,data:tThin.map(ti=>({x:ti,y:parseFloat(Math.max(0,r.pred[Math.min(ti,r.pred.length-1)]||0).toFixed(4))})),
+      type:'line',borderColor:'#aaa9a0',borderDash:[4,3],borderWidth:1,pointRadius:0,fill:false,order:3});
+  });
+
+  const chartOpts={responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
+    scales:{x:{title:{display:true,text:'Time (minutes)',font:{size:11},color:'#888'},ticks:{color:'#888',font:{size:10}}},
+            y:{ticks:{color:'#888',font:{size:10}}}}};
+
+  fitChart=new Chart(document.getElementById('mrChart'),{type:'scatter',data:{datasets:mrDatasets},
+    options:{...chartOpts,scales:{...chartOpts.scales,y:{...chartOpts.scales.y,min:0,max:1.05,title:{display:true,text:'Moisture ratio (MR)',font:{size:11},color:'#888'}}}}});
+
+  fitChart2=new Chart(document.getElementById('waterChart'),{type:'line',
+    data:{datasets:[{label:'Water remaining',data:tThin.map((ti,i)=>({x:ti,y:waterThin[i]})),
+      borderColor:color,borderWidth:2,pointRadius:0,fill:true,backgroundColor:color+'18'}]},
+    options:{...chartOpts,scales:{...chartOpts.scales,y:{...chartOpts.scales.y,title:{display:true,text:'Water remaining (kg)',font:{size:11},color:'#888'}}}}});
+}
+
+best=null;
+Chart.defaults.font.family=getComputedStyle(document.body).getPropertyValue('--font-mono')||'monospace';
+init();
+</script>

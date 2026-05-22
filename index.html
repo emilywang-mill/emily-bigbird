@@ -265,7 +265,13 @@ const SENSORS = [
   { m:'blower_kwh',  l:'Blower kWh',     u:'kWh', g:'Energy', c:'#064e3b' },
   { m:'air_kwh',     l:'Air Heater kWh', u:'kWh', g:'Energy', c:'#f59e0b' },
   { m:'__total_kwh__', l:'Energy Consumption', u:'kWh (20 min bins)', g:'Energy', c:'#111827', derived:true },
-  { m:'__power_kw__',  l:'Power Consumption',  u:'kW',               g:'Energy', c:'#374151', derived:true },
+  { m:'__power_kw__',  l:'Power Consumption (20 min avg)', u:'kW', g:'Energy', c:'#374151', derived:true },
+  // ── Power (instantaneous, per component) ─────────────────
+  { m:'__pw_total__',   l:'Total Power',        u:'kW', g:'Power', c:'#111827', derived:true },
+  { m:'__pw_motor__',   l:'Motor Power',        u:'kW', g:'Power', c:'#1d4ed8', derived:true },
+  { m:'__pw_oil__',     l:'Oil Heater Power',   u:'kW', g:'Power', c:'#8b5cf6', derived:true },
+  { m:'__pw_cond__',    l:'Condenser Power',    u:'kW', g:'Power', c:'#db2777', derived:true },
+  { m:'__pw_air__',     l:'Air Heater Power',   u:'kW', g:'Power', c:'#f59e0b', derived:true },
   // ── Process Vessel ──────────────────────────────────────
   { m:'mass_g',                                   l:'Mass',                       u:'g',      g:'Process Vessel',     c:'#3a9e5c' },
   { m:'d208_jacket_oil_temperature',              l:'Oil Temp',                   u:'°C',     g:'Process Vessel',     c:'#d4700a' },
@@ -538,6 +544,56 @@ function loadRun(name){
 }
 
 // ══════════════════════════════════════════════════════════
+// DERIVED: Instantaneous Power per component (kW)
+// Exact port of kWh_per_kg_Plot.ipynb power model:
+//   ch0 (motor)      : ch0_rms × 208                       [W]
+//   ch1 (oil heater) : ch1_rms × 208 × SQRT(oil_pwm/100)  [W]  × 3 (3-phase)
+//   ch4 (condenser)  : ch4_rms × 208                       [W]
+//   ch6 (air heater) : ch6_rms × 208 × SQRT(air_pwm/100)  [W]
+// ══════════════════════════════════════════════════════════
+function _pwResolve(d){
+  const {channels,headers}=d;
+  return {
+    ch:  [0,1,4,6].map(i=>resolveCol(headers,`current__ch${i}_rms`)),
+    oilPwm: resolveCol(headers,'d202_oil_heater_controller_pwm_1'),
+    airPwm: resolveCol(headers,'d401_air_heater_controller_pwm'),
+    channels, n: (channels[resolveCol(headers,'current__ch0_rms')||resolveCol(headers,'current__ch1_rms')||resolveCol(headers,'current__ch4_rms')||resolveCol(headers,'current__ch6_rms')] || {length:0}).length
+  };
+}
+function _pwMotor(d){
+  const {ch,channels,n}=_pwResolve(d);
+  const c=ch[0]; if(!c||!n) return null;
+  return Array.from({length:n},(_,i)=>(channels[c][i]||0)*208/1000);
+}
+function _pwOil(d){
+  const {ch,oilPwm,channels,n}=_pwResolve(d);
+  const c=ch[1]; if(!c||!n) return null;
+  return Array.from({length:n},(_,i)=>{
+    const frac=oilPwm?(channels[oilPwm][i]||0)/100:0;
+    return (channels[c][i]||0)*208*Math.sqrt(frac)*3/1000;
+  });
+}
+function _pwCond(d){
+  const {ch,channels,n}=_pwResolve(d);
+  const c=ch[2]; if(!c||!n) return null;
+  return Array.from({length:n},(_,i)=>(channels[c][i]||0)*208/1000);
+}
+function _pwAir(d){
+  const {ch,airPwm,channels,n}=_pwResolve(d);
+  const c=ch[3]; if(!c||!n) return null;
+  return Array.from({length:n},(_,i)=>{
+    const frac=airPwm?(channels[airPwm][i]||0)/100:0;
+    return (channels[c][i]||0)*208*Math.sqrt(frac)/1000;
+  });
+}
+function _pwTotal(d){
+  const parts=[_pwMotor(d),_pwOil(d),_pwCond(d),_pwAir(d)].filter(Boolean);
+  if(!parts.length) return null;
+  const n=parts[0].length;
+  return Array.from({length:n},(_,i)=>parts.reduce((s,a)=>s+(a[i]||0),0));
+}
+
+// ══════════════════════════════════════════════════════════
 // DERIVED: Estimated Airflow (CFM)
 // Energy-balance method matching the reference Python implementation:
 //   ah_q  = ch6_rms × 208 V × (ah_pwm / 100)          [W]
@@ -636,6 +692,12 @@ function getVals(runName,m){
     const n=d.channels[cols[0]].length;
     return Array.from({length:n},(_,i)=>cols.reduce((s,c)=>s+(d.channels[c][i]||0),0)*3);
   }
+  if(m==='__instant_power__') return _pwTotal(d);
+  if(m==='__pw_total__')    return _pwTotal(d);
+  if(m==='__pw_motor__')    return _pwMotor(d);
+  if(m==='__pw_oil__')      return _pwOil(d);
+  if(m==='__pw_cond__')     return _pwCond(d);
+  if(m==='__pw_air__')      return _pwAir(d);
   if(m==='__kwh_per_kg__'){
     // kWh/kg per bin: same 20-min bins as energy consumption
     // numerator  = total kWh in that bin (sum of kWh cols — forward-filled, so use value at bin start)
@@ -1034,7 +1096,7 @@ function renderRunStats(){
           <span class="stat-value${na(runHours)}">${fv(runHours,1,'h')}</span>
         </div>
         <div class="stat-row">
-          <span class="stat-label">Total kWh</span>
+          <span class="stat-label">Total energy (kWh)</span>
           <span class="stat-value${na(totalKwh)}">${fv(totalKwh,2,'kWh')}</span>
         </div>
         <div class="stat-row">
@@ -1042,7 +1104,7 @@ function renderRunStats(){
           <span class="stat-value${na(avgKwhKg)}">${fv(avgKwhKg,2,'kWh/kg')}</span>
         </div>
         <div class="stat-row">
-          <span class="stat-label">Avg kW</span>
+          <span class="stat-label">Average power draw (kW)</span>
           <span class="stat-value${na(avgKw)}">${fv(avgKw,2,'kW')}</span>
         </div>
         <div class="stat-divider"></div>
