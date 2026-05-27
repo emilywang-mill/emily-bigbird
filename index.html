@@ -76,6 +76,10 @@ header .status .dot { width:6px; height:6px; border-radius:50%; background:var(-
 .stat-section-label { font-size:9px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
   color:var(--muted2); margin-top:4px; margin-bottom:2px; }
 .stat-divider { height:1px; background:var(--border); margin:6px 0 4px; }
+.stat-params { display:flex; flex-wrap:wrap; gap:4px 8px; margin-top:2px; }
+.stat-param { font-size:9px; background:var(--bg); border:1px solid var(--border);
+  border-radius:3px; padding:1px 5px; color:var(--muted); white-space:nowrap; }
+.stat-param span { color:var(--text); font-weight:500; font-family:var(--mono); }
 
 /* ─ controls bar ─ */
 .controls-bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
@@ -149,6 +153,19 @@ header .status .dot { width:6px; height:6px; border-radius:50%; background:var(-
   padding:1px 3px; border-radius:2px; font-family:var(--mono); transition:color .1s; line-height:1; }
 .y-scale-reset:hover { color:var(--danger); }
 
+/* ─ run filter controls ─ */
+.run-filters { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; align-items:center; }
+.run-filter-label { font-size:9px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted2); white-space:nowrap; }
+.run-filter-select { font-size:10px; font-family:var(--mono); padding:2px 6px;
+  background:var(--bg); border:1px solid var(--border); border-radius:3px; color:var(--text);
+  cursor:pointer; outline:none; }
+.run-filter-select:focus { border-color:var(--border2); }
+.run-filter-select.active { border-color:var(--accent); background:rgba(26,110,60,.05); }
+.run-filter-clear { font-size:9px; color:var(--muted2); cursor:pointer; background:none; border:none;
+  padding:1px 4px; border-radius:2px; font-family:var(--mono); }
+.run-filter-clear:hover { color:var(--danger); }
+
 /* ─ crosshair + tooltip ─ */
 #crosshair-overlay { position:fixed; top:0; left:0; width:1px; pointer-events:none; z-index:50; background:rgba(26,110,60,.5); display:none; }
 #tooltip-card { position:fixed; background:var(--surface); border:1px solid var(--border2); border-radius:5px; padding:8px 12px; font-size:11px; pointer-events:none; z-index:60; display:none; max-width:290px; box-shadow:0 4px 20px rgba(0,0,0,.12); }
@@ -173,6 +190,23 @@ header .status .dot { width:6px; height:6px; border-radius:50%; background:var(-
 <div style="margin-bottom:12px;">
   <div class="panel" style="display:inline-block;min-width:300px;max-width:100%;">
     <div class="panel-label">Runs</div>
+    <div class="run-filters" id="runFilters" style="display:none">
+      <span class="run-filter-label">Oil</span>
+      <select class="run-filter-select" id="filterOil" onchange="applyRunFilters()">
+        <option value="">All</option>
+      </select>
+      <span class="run-filter-label">Air</span>
+      <select class="run-filter-select" id="filterAir" onchange="applyRunFilters()">
+        <option value="">All</option>
+      </select>
+      <span class="run-filter-label">Crust</span>
+      <select class="run-filter-select" id="filterCrust" onchange="applyRunFilters()">
+        <option value="">All</option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+      <button class="run-filter-clear" id="filterClearBtn" onclick="clearRunFilters()" style="display:none">✕ clear</button>
+    </div>
     <div class="run-pills" id="pills"><span style="color:var(--muted2)">discovering…</span></div>
   </div>
 </div>
@@ -415,10 +449,12 @@ async function tryLoadLabels() {
     const obj=await r.json();
     // Support both old string format {"run":"label"} and new object format {"run":{label,measured_mc}}
     for(const [k,v] of Object.entries(obj)){
-      RUN_LABELS[k] = typeof v==='string' ? {label:v, measured_mc:null} : v;
+      if(k.startsWith('_')) continue; // skip comment keys
+      RUN_LABELS[k] = typeof v==='string' ? {label:v, measured_mc:null, oil_temp_c:null, air_temp_c:null, blower_pwm_pct:null} : v;
     }
     renderPills();
     renderRunStats();
+    buildRunFilterOptions();
   } catch {}
 }
 
@@ -739,12 +775,59 @@ function getVals(runName,m){
 // ══════════════════════════════════════════════════════════
 // PILLS
 // ══════════════════════════════════════════════════════════
+// ── Run filters ──────────────────────────────────────────────────────────────
+function buildRunFilterOptions(){
+  // Collect unique oil and air temps from RUN_LABELS, sorted numerically
+  const oils=new Set(), airs=new Set();
+  Object.values(RUN_LABELS).forEach(v=>{
+    if(v.oil_temp_c!=null) oils.add(v.oil_temp_c);
+    if(v.air_temp_c!=null) airs.add(v.air_temp_c);
+  });
+  const oilSel=document.getElementById('filterOil');
+  const airSel=document.getElementById('filterAir');
+  // Rebuild options (keep "All" first)
+  [...oils].sort((a,b)=>a-b).forEach(t=>{
+    const o=document.createElement('option'); o.value=t; o.textContent=t+'°C'; oilSel.appendChild(o);
+  });
+  [...airs].sort((a,b)=>a-b).forEach(t=>{
+    const o=document.createElement('option'); o.value=t; o.textContent=t+'°C'; airSel.appendChild(o);
+  });
+  // Show filter bar only if we have data
+  if(oils.size||airs.size) document.getElementById('runFilters').style.display='flex';
+}
+
+function applyRunFilters(){
+  const oilVal=document.getElementById('filterOil').value;
+  const airVal=document.getElementById('filterAir').value;
+  const crustVal=document.getElementById('filterCrust').value;
+  const active=oilVal||airVal||crustVal;
+  document.getElementById('filterClearBtn').style.display=active?'inline':'none';
+  document.getElementById('filterOil').classList.toggle('active',!!oilVal);
+  document.getElementById('filterAir').classList.toggle('active',!!airVal);
+  document.getElementById('filterCrust').classList.toggle('active',!!crustVal);
+  document.querySelectorAll('#pills .pill').forEach(pill=>{
+    const run=pill.dataset.run;
+    const rl=RUN_LABELS[run]||{};
+    const oilMatch=!oilVal||(rl.oil_temp_c!=null&&String(rl.oil_temp_c)===oilVal);
+    const airMatch=!airVal||(rl.air_temp_c!=null&&String(rl.air_temp_c)===airVal);
+    const crustMatch=!crustVal||(rl.started_with_crust!=null&&rl.started_with_crust===crustVal);
+    pill.style.display=(oilMatch&&airMatch&&crustMatch)?'':'none';
+  });
+}
+
+function clearRunFilters(){
+  document.getElementById('filterOil').value='';
+  document.getElementById('filterAir').value='';
+  document.getElementById('filterCrust').value='';
+  applyRunFilters();
+}
+
 function renderPills(){
   const el=document.getElementById('pills'); el.innerHTML='';
   for(const[name,meta]of Object.entries(RUNS)){
     const btn=document.createElement('button');
     btn.className='pill'+(activeRuns.has(name)?' on':'');
-    btn.id='pill-'+name; btn.textContent=name;
+    btn.id='pill-'+name; btn.dataset.run=name; btn.textContent=name;
     btn.style.cssText=`border-color:${meta.color};color:${meta.color};`;
     btn.onclick=()=>toggleRun(name);
     el.appendChild(btn);
@@ -1081,6 +1164,14 @@ function renderRunStats(){
     const measuredMc=(RUN_LABELS[runName]&&RUN_LABELS[runName].measured_mc!=null)
       ? RUN_LABELS[runName].measured_mc : null;
 
+    // ── Run parameters: from run_labels.json ─────────────────────────────────
+    const rl=RUN_LABELS[runName]||{};
+    const params=[
+      rl.oil_temp_c!=null     ? {k:'Oil',     v:rl.oil_temp_c+'°C'}      : null,
+      rl.air_temp_c!=null     ? {k:'Air',     v:rl.air_temp_c+'°C'}      : null,
+      rl.blower_pwm_pct!=null ? {k:'Blower',  v:rl.blower_pwm_pct+'%'}   : null,
+    ].filter(Boolean);
+
     // ── Cutoff label ─────────────────────────────────────────────────────────
     const cutLabel=hitTarget?'Start → 10% MC':'Start → End (MC never hit 10%)';
 
@@ -1126,6 +1217,10 @@ function renderRunStats(){
           <span class="stat-label">Measured MC</span>
           <span class="stat-value${na(measuredMc)}">${fv(measuredMc,1,'%')}</span>
         </div>
+        ${params.length?`
+        <div class="stat-divider"></div>
+        <div class="stat-section-label">Parameters</div>
+        <div class="stat-params">${params.map(p=>`<div class="stat-param">${p.k} <span>${p.v}</span></div>`).join('')}</div>`:''}
       </div>`;
     grid.appendChild(card);
   });
