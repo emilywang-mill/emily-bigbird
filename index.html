@@ -413,8 +413,10 @@ async function tryLoadLabels() {
     const r=await fetch(`https://raw.githubusercontent.com/${REPO}/${BRANCH}/run_labels.json`);
     if(!r.ok) return;
     const obj=await r.json();
-    Object.assign(RUN_LABELS, obj);
-    // Re-render pills and stats now that labels are loaded
+    // Support both old string format {"run":"label"} and new object format {"run":{label,measured_mc}}
+    for(const [k,v] of Object.entries(obj)){
+      RUN_LABELS[k] = typeof v==='string' ? {label:v, measured_mc:null} : v;
+    }
     renderPills();
     renderRunStats();
   } catch {}
@@ -1068,13 +1070,16 @@ function renderRunStats(){
     let avgKw=null;
     if(totalKwh!=null&&runHours!=null&&runHours>0) avgKw=totalKwh/runHours;
 
-    // ── End MC%: last non-null MC value in full run ───────────────────────────
+    // ── Estimated MC%: last non-null MC value in full run ──────────────────────
     let endMc=null;
     if(mcArr){
       for(let i=n-1;i>=0;i--){
         if(mcArr[i]!=null&&!isNaN(mcArr[i])&&mcArr[i]>0){endMc=mcArr[i];break;}
       }
     }
+    // ── Measured MC%: from run_labels.json ──────────────────────────────────
+    const measuredMc=(RUN_LABELS[runName]&&RUN_LABELS[runName].measured_mc!=null)
+      ? RUN_LABELS[runName].measured_mc : null;
 
     // ── Cutoff label ─────────────────────────────────────────────────────────
     const cutLabel=hitTarget?'Start → 10% MC':'Start → End (MC never hit 10%)';
@@ -1087,7 +1092,7 @@ function renderRunStats(){
     card.innerHTML=`
       <div class="stat-card-run">
         <span class="run-swatch" style="background:${color}"></span>
-        <span>${runName}${RUN_LABELS[runName]?' <span style="font-weight:400;opacity:.7">— '+RUN_LABELS[runName]+'</span>':''}</span>
+        <span>${runName}${RUN_LABELS[runName]&&RUN_LABELS[runName].label?' <span style="font-weight:400;opacity:.7">— '+RUN_LABELS[runName].label+'</span>':''}</span>
       </div>
       <div class="stat-rows">
         <div class="stat-section-label">${cutLabel}</div>
@@ -1114,8 +1119,12 @@ function renderRunStats(){
           <span class="stat-value${na(waterKg)}">${fv(waterKg,2,'kg')}</span>
         </div>
         <div class="stat-row">
-          <span class="stat-label">End MC</span>
+          <span class="stat-label">Estimated MC</span>
           <span class="stat-value${na(endMc)}">${fv(endMc,1,'%')}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Measured MC</span>
+          <span class="stat-value${na(measuredMc)}">${fv(measuredMc,1,'%')}</span>
         </div>
       </div>`;
     grid.appendChild(card);
