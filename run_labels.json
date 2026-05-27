@@ -21,5 +21,6 @@
   "0514": { "label": "Algos #3, No Crust",      "measured_mc": 17.0 },
   "0519": { "label": "Clean PV, Less Carrots",  "measured_mc": 9.80 },
   "0520": { "label": "Crust PV, Less Carrots",  "measured_mc": 7.97 },
-  "0521": { "label": "Crust PV, Less Carrots, Ctrl",  "measured_mc": 3.88 }
+  "0521": { "label": "Crust PV, Less Carrots, Ctrl",  "measured_mc": 3.88 },
+  "0526": { "label": "Make Crust, Ctrl",  "measured_mc": 28.79 }
 }
