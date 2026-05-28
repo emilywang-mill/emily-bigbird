@@ -24,5 +24,6 @@
   "0520": { "label": "Crust PV, Less Carrots",      "measured_mc": 7.97,  "oil_temp_c": 185,  "air_temp_c": 120,  "blower_pwm_pct": 65,   "started_with_crust": "yes" },
   "0521": { "label": "Less Carrots, Ctrl",          "measured_mc": 3.88,  "oil_temp_c": 185,  "air_temp_c": 180,  "blower_pwm_pct": 43,   "started_with_crust": "yes" },
   "0526": { "label": "Clean PV, Ctrl",              "measured_mc": 23.79, "oil_temp_c": 185,  "air_temp_c": 180,  "blower_pwm_pct": 43,   "started_with_crust": "no" },
-  "0527": { "label": "Crust PV, Ctrl",              "measured_mc": null,  "oil_temp_c": 185,  "air_temp_c": 180,  "blower_pwm_pct": 43,   "started_with_crust": "yes" }
+  "0527": { "label": "Crust PV, Ctrl",              "measured_mc": 7.38,  "oil_temp_c": 185,  "air_temp_c": 180,  "blower_pwm_pct": 43,   "started_with_crust": "yes" },
+  "0528": { "label": "Crust PV, Low Oil PWM",       "measured_mc": null,  "oil_temp_c": 185,  "air_temp_c": 180,  "blower_pwm_pct": 43,   "started_with_crust": "no" }
 }

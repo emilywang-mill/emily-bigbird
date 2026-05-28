@@ -205,6 +205,13 @@ header .status .dot { width:6px; height:6px; border-radius:50%; background:var(-
         <option value="yes">Yes</option>
         <option value="no">No</option>
       </select>
+      <span class="run-filter-label">Input</span>
+      <select class="run-filter-select" id="filterInput" onchange="applyRunFilters()">
+        <option value="">All</option>
+        <option value="40kg_carrot">40 kg Carrot</option>
+        <option value="30kg_carrot">30 kg Carrot</option>
+        <option value="water">Water</option>
+      </select>
       <button class="run-filter-clear" id="filterClearBtn" onclick="clearRunFilters()" style="display:none">✕ clear</button>
     </div>
     <div class="run-pills" id="pills"><span style="color:var(--muted2)">discovering…</span></div>
@@ -800,18 +807,21 @@ function applyRunFilters(){
   const oilVal=document.getElementById('filterOil').value;
   const airVal=document.getElementById('filterAir').value;
   const crustVal=document.getElementById('filterCrust').value;
-  const active=oilVal||airVal||crustVal;
+  const inputVal=document.getElementById('filterInput').value;
+  const active=oilVal||airVal||crustVal||inputVal;
   document.getElementById('filterClearBtn').style.display=active?'inline':'none';
   document.getElementById('filterOil').classList.toggle('active',!!oilVal);
   document.getElementById('filterAir').classList.toggle('active',!!airVal);
   document.getElementById('filterCrust').classList.toggle('active',!!crustVal);
+  document.getElementById('filterInput').classList.toggle('active',!!inputVal);
   document.querySelectorAll('#pills .pill').forEach(pill=>{
     const run=pill.dataset.run;
     const rl=RUN_LABELS[run]||{};
     const oilMatch=!oilVal||(rl.oil_temp_c!=null&&String(rl.oil_temp_c)===oilVal);
     const airMatch=!airVal||(rl.air_temp_c!=null&&String(rl.air_temp_c)===airVal);
     const crustMatch=!crustVal||(rl.started_with_crust!=null&&rl.started_with_crust===crustVal);
-    pill.style.display=(oilMatch&&airMatch&&crustMatch)?'':'none';
+    const inputMatch=!inputVal||(rl.input!=null&&rl.input===inputVal);
+    pill.style.display=(oilMatch&&airMatch&&crustMatch&&inputMatch)?'':'none';
   });
 }
 
@@ -819,6 +829,7 @@ function clearRunFilters(){
   document.getElementById('filterOil').value='';
   document.getElementById('filterAir').value='';
   document.getElementById('filterCrust').value='';
+  document.getElementById('filterInput').value='';
   applyRunFilters();
 }
 

@@ -150,5 +150,20 @@
     {"timestamp": "2026-05-21 10:00:00", "label": "Air 43% (20 CFM)"},
     {"timestamp": "2026-05-21 13:32:00", "label": "2nd stage DGO (Air 120 C, 73% PWM)"},
     {"timestamp": "2026-05-21 18:29:00", "label": "CD start"}
+  ],
+  "0526": [
+    {"timestamp": "2026-05-26 09:12:00", "label": "DGO start"},
+    {"timestamp": "2026-05-26 10:12:00", "label": "Boo Boo"},
+    {"timestamp": "2026-05-26 13:16:00", "label": "Int A start"},
+    {"timestamp": "2026-05-26 18:17:00", "label": "CD start"}
+  ],
+  "0527": [
+    {"timestamp": "2026-05-27 09:44:00", "label": "DGO start"},
+    {"timestamp": "2026-05-27 13:44:00", "label": "Int A start"},
+    {"timestamp": "2026-05-27 17:21:00", "label": "CD start"}
+  ],
+  "0528": [
+    {"timestamp": "2026-05-28 08:58:00", "label": "DGO start"},
+    {"timestamp": "2026-05-28 19:01:00", "label": "CD start"}
   ]
 }
