@@ -416,6 +416,7 @@ let RUN_EVENTS = {
 // STATE
 // ══════════════════════════════════════════════════════════
 let RUNS={}, datasets={}, activeRuns=new Set();
+let _colorIdx=0; // increments each time a run is activated — ensures no color repeats
 let winMin=10, viewMode='smooth', showEvents=false, showTooltip=true;
 let xMode='time';    // 'time' | 'mass'
 let alignMode='ramp'; // 'oil' | 'ramp'
@@ -452,12 +453,12 @@ async function discoverRuns() {
       const files=await r.json();
       files.filter(f=>f.name.endsWith('.csv')).forEach(f=>{
         const n=f.name.replace('.csv','');
-        if(!RUNS[n]) RUNS[n]={label:n,color:RUN_COLORS[Object.keys(RUNS).length%RUN_COLORS.length]};
+        if(!RUNS[n]) RUNS[n]={label:n,color:null}; // color assigned on first activation
       });
     } else throw 0;
   } catch {
     ['0302','0407','0409','0415','0416','0420','0421','0422','0423','0427','0428','0504','0505']
-      .forEach((n,i)=>{ if(!RUNS[n]) RUNS[n]={label:n,color:RUN_COLORS[i%RUN_COLORS.length]}; });
+      .forEach(n=>{ if(!RUNS[n]) RUNS[n]={label:n,color:null}; });
   }
   await tryLoadEvents();
   tryLoadLabels();
@@ -862,6 +863,8 @@ async function toggleRun(name){
   const pill=document.getElementById('pill-'+name);
   if(activeRuns.has(name)){activeRuns.delete(name);pill.classList.remove('on');}
   else{
+    // Assign color by activation order — guarantees no repeats regardless of run ID
+    if(!RUNS[name].color) RUNS[name].color=RUN_COLORS[_colorIdx++%RUN_COLORS.length];
     activeRuns.add(name);
     if(!datasets[name]){
       const orig=pill.textContent; pill.textContent=name+' …';
@@ -1550,6 +1553,7 @@ async function init(){
   document.getElementById('initLoading').remove();
   renderAllPlots(); renderChipStrip(); renderRunStats();
   document.getElementById('statusText').textContent='loading data…';
+  [...activeRuns].forEach(n=>{ if(RUNS[n]&&!RUNS[n].color) RUNS[n].color=RUN_COLORS[_colorIdx++%RUN_COLORS.length]; });
   await Promise.all([...activeRuns].map(n=>loadRun(n).catch(()=>activeRuns.delete(n))));
   rebuildAll(); renderChipStrip();
   document.getElementById('statusText').textContent=`${Object.keys(RUNS).length} runs · ${Object.keys(datasets).length} loaded`;
