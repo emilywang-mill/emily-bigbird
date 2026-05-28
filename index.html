@@ -77,6 +77,10 @@ header .status .dot { width:6px; height:6px; border-radius:50%; background:var(-
   color:var(--muted2); margin-top:4px; margin-bottom:2px; }
 .stat-divider { height:1px; background:var(--border); margin:6px 0 4px; }
 .stat-params { display:flex; flex-wrap:wrap; gap:4px 8px; margin-top:2px; }
+.stat-card.collapsed .stat-rows { display:none; }
+.stat-card-toggle { font-size:9px; color:var(--muted2); cursor:pointer; background:none; border:none;
+  padding:0; line-height:1; float:right; margin-left:auto; }
+.stat-card-toggle:hover { color:var(--text); }
 .stat-param { font-size:9px; background:var(--bg); border:1px solid var(--border);
   border-radius:3px; padding:1px 5px; color:var(--muted); white-space:nowrap; }
 .stat-param span { color:var(--text); font-weight:500; font-family:var(--mono); }
@@ -189,7 +193,13 @@ header .status .dot { width:6px; height:6px; border-radius:50%; background:var(-
 
 <div style="margin-bottom:12px;">
   <div class="panel" style="display:inline-block;min-width:300px;max-width:100%;">
-    <div class="panel-label">Runs</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div class="panel-label" style="margin-bottom:0">Runs</div>
+      <button id="collapseAllBtn" onclick="toggleCollapseAll()"
+        style="font-size:9px;font-family:var(--mono);color:var(--muted2);background:none;border:1px solid var(--border);
+               border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;"
+        title="Collapse / expand all cards">Collapse all</button>
+    </div>
     <div class="run-filters" id="runFilters" style="display:none">
       <span class="run-filter-label">Oil</span>
       <select class="run-filter-select" id="filterOil" onchange="applyRunFilters()">
@@ -1192,9 +1202,10 @@ function renderRunStats(){
     const card=document.createElement('div');
     card.className='stat-card';
     card.innerHTML=`
-      <div class="stat-card-run">
+      <div class="stat-card-run" onclick="this.closest('.stat-card').classList.toggle('collapsed')" style="cursor:pointer;user-select:none;">
         <span class="run-swatch" style="background:${color}"></span>
         <span>${runName}${RUN_LABELS[runName]&&RUN_LABELS[runName].label?' <span style="font-weight:400;opacity:.7">— '+RUN_LABELS[runName].label+'</span>':''}</span>
+        <span class="stat-card-toggle" style="margin-left:auto">▾</span>
       </div>
       <div class="stat-rows">
         <div class="stat-section-label">${cutLabel}</div>
@@ -1230,11 +1241,19 @@ function renderRunStats(){
         </div>
         ${params.length?`
         <div class="stat-divider"></div>
-        <div class="stat-section-label">Parameters</div>
+        <div class="stat-section-label">Initial Parameters</div>
         <div class="stat-params">${params.map(p=>`<div class="stat-param">${p.k} <span>${p.v}</span></div>`).join('')}</div>`:''}
       </div>`;
     grid.appendChild(card);
   });
+}
+
+function toggleCollapseAll(){
+  const cards=document.querySelectorAll('.stat-card');
+  const btn=document.getElementById('collapseAllBtn');
+  const anyExpanded=[...cards].some(c=>!c.classList.contains('collapsed'));
+  cards.forEach(c=>c.classList.toggle('collapsed',anyExpanded));
+  btn.textContent=anyExpanded?'Expand all':'Collapse all';
 }
 
 function setYOverride(plotId){
