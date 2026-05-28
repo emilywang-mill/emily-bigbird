@@ -1187,11 +1187,13 @@ function renderRunStats(){
 
     // ── Run parameters: from run_labels.json ─────────────────────────────────
     const rl=RUN_LABELS[runName]||{};
+    const INPUT_LABELS={'40kg_carrot':'40 kg Carrot','30kg_carrot':'30 kg Carrot','water':'Water'};
     const params=[
       rl.oil_temp_c!=null     ? {k:'Oil',      v:rl.oil_temp_c+'°C'}                                        : null,
       rl.air_temp_c!=null     ? {k:'Air',      v:rl.air_temp_c+'°C'}                                        : null,
       rl.blower_pwm_pct!=null ? {k:'Blower',   v:rl.blower_pwm_pct+'%'}                                     : null,
       rl.started_with_crust!=null ? {k:'PV State', v:rl.started_with_crust==='yes'?'Crust':'No Crust'}      : null,
+      rl.input!=null          ? {k:'Input',    v:INPUT_LABELS[rl.input]||rl.input}                           : null,
     ].filter(Boolean);
 
     // ── Cutoff label ─────────────────────────────────────────────────────────
