@@ -164,6 +164,9 @@
   ],
   "0528": [
     {"timestamp": "2026-05-28 08:58:00", "label": "DGO start"},
+    {"timestamp": "2026-05-28 10:55:00", "label": "Crash"},
+    {"timestamp": "2026-05-28 11:15:00", "label": "Bimetallic trip"},
+    {"timestamp": "2026-05-28 13:20:00", "label": "Int A start"},
     {"timestamp": "2026-05-28 19:01:00", "label": "CD start"}
   ]
 }
