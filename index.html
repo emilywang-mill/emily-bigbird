@@ -52,7 +52,7 @@ header .status .dot { width:6px; height:6px; border-radius:50%; background:var(-
 .panel-label { font-size:9px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--muted2); margin-bottom:8px; }
 .run-pills { display:flex; flex-wrap:wrap; gap:4px; }
 .pill { padding:3px 8px; border-radius:3px; border:1px solid var(--border2); font-family:var(--mono); font-size:11px; cursor:pointer; transition:all .1s; background:transparent; color:var(--muted2); opacity:.55; line-height:1.5; }
-.pill.on { opacity:1; background:rgba(0,0,0,.04); }
+.pill.on { opacity:1; }
 .pill:hover { opacity:.75; }
 
 /* ─ run stats panel ─ */
@@ -394,7 +394,7 @@ const SENSORS = [
 ];
 
 const RUN_COLORS = [
-  '#1a6e3c','#1a4e8a','#c0392b','#d4700a','#7c3aed',
+  '#1a6e3c','#c0392b','#1a4e8a','#d4700a','#7c3aed',
   '#0891b2','#be185d','#065f46','#1e40af','#92400e',
   '#5b21b6','#0e7490','#9d174d','#047857','#b45309',
   '#0f766e','#7e22ce','#b91c1c','#15803d','#1d4ed8',
@@ -863,25 +863,32 @@ function renderPills(){
     const btn=document.createElement('button');
     btn.className='pill'+(activeRuns.has(name)?' on':'');
     btn.id='pill-'+name; btn.dataset.run=name; btn.textContent=name;
-    const pColor=activeRuns.has(name)?getRunColor(name):'var(--border2)';
-    btn.style.cssText=`border-color:${pColor};color:${activeRuns.has(name)?pColor:'var(--muted2)'};`;
+    const isOn=activeRuns.has(name);
+    const pColor=isOn?getRunColor(name):'var(--border2)';
+    btn.style.cssText=`border-color:${pColor};color:${isOn?pColor:'var(--muted2)'};${isOn?`background:${pColor}1a;font-weight:600;`:''}`;
     btn.onclick=()=>toggleRun(name);
     el.appendChild(btn);
   }
 }
 async function toggleRun(name){
-  const pill=document.getElementById('pill-'+name);
-  if(activeRuns.has(name)){activeRuns.delete(name);pill.classList.remove('on');}
-  else{
+  if(activeRuns.has(name)){
+    activeRuns.delete(name);
+  } else {
     activeRuns.add(name);
     if(!datasets[name]){
+      // Show loading state on pill while fetching
+      const pill=document.getElementById('pill-'+name);
       const orig=pill.textContent; pill.textContent=name+' …';
       try{await loadRun(name);pill.textContent=orig;}
-      catch{pill.textContent=name+' ✕';activeRuns.delete(name);pill.classList.remove('on');return;}
+      catch{
+        pill.textContent=name+' ✕';
+        activeRuns.delete(name);
+        renderPills();
+        return;
+      }
     }
-    pill.classList.add('on');
   }
-  rebuildAll(); renderRunStats();
+  renderPills(); rebuildAll(); renderRunStats();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -957,7 +964,7 @@ function buildDS(m){
     const vals=getVals(name,m); if(!vals) continue;
     const xArr=getXArr(d);
     const tHr=getTHr(d);
-    const color=RUNS[name].color, sm=rolling(vals,winMin,tHr);
+    const color=getRunColor(name), sm=rolling(vals,winMin,tHr);
     if(viewMode==='raw'||viewMode==='both')
       out.push({label:name+'_raw',data:xArr.map((x,i)=>({x:+x.toFixed(4),y:+vals[i].toFixed(4)})),
         borderColor:color,backgroundColor:'transparent',borderWidth:viewMode==='both'?0.7:1.2,
@@ -975,7 +982,7 @@ function makeEvPlugin(plotId){
     const{ctx,scales:{x},chartArea:{top,bottom}}=chart;
     for(const name of activeRuns){
       const d=datasets[name]; if(!d||!getT0Ts(d)||!RUN_EVENTS[name]) continue;
-      const color=RUNS[name].color;
+      const color=getRunColor(name);
       RUN_EVENTS[name].forEach((ev,ei)=>{
         const xPx=x.getPixelForValue((parseTs(ev.ts)-getT0Ts(d))/3600000);
         if(xPx<chart.chartArea.left||xPx>chart.chartArea.right) return;
@@ -1007,7 +1014,7 @@ function makePeakPlugin(plotId, m){
         if(!isFinite(peak)) continue;
         const yPx=y.getPixelForValue(peak);
         if(yPx<chart.chartArea.top||yPx>chart.chartArea.bottom) continue;
-        const color=RUNS[name].color;
+        const color=getRunColor(name);
         ctx.save();
         ctx.strokeStyle=color; ctx.globalAlpha=0.45; ctx.lineWidth=1;
         ctx.setLineDash([6,4]);
@@ -1136,7 +1143,7 @@ function renderRunStats(){
   activeRuns.forEach(runName=>{
     const d=datasets[runName];
     if(!d) return;
-    const color=(RUNS[runName]&&RUNS[runName].color)||'#888';
+    const color=getRunColor(runName)||'#888';
 
     // ── Find index where MC first hits ≤10% (cutoff for drying stats) ────────
     const mcCol=resolveCol(d.headers,'predicted_mc_pct');
@@ -1312,7 +1319,7 @@ function updateLegend(plotId,m){
     const vals=getVals(name,m); if(!vals) continue;
     const sm=rolling(vals,winMin,getTHr(d)), peak=Math.max(...sm.filter(isFinite));
     el.innerHTML+=`<div class="legend-item">
-      <span class="legend-dot" style="background:${RUNS[name].color}"></span>
+      <span class="legend-dot" style="background:${getRunColor(name)}"></span>
       <span>${name}</span>
       <span class="legend-peak">peak ${isFinite(peak)?peak.toFixed(2):'—'}</span>
     </div>`;
@@ -1359,7 +1366,7 @@ function showTT(cx,cy,xVal){
       const src=viewMode==='raw'?vals:rolling(vals,winMin,getTHr(d));
       const v=src[lo];
       html+=`<div class="tt-row">
-        <span class="tt-dot" style="background:${RUNS[name].color}"></span>
+        <span class="tt-dot" style="background:${getRunColor(name)}"></span>
         <span class="tt-run">${name}</span>
         <span class="tt-val">${isFinite(v)?v.toFixed(2):'—'}${s.u?' '+s.u:''}</span>
       </div>`;
