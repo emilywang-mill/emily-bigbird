@@ -30,6 +30,11 @@
     {"timestamp": "2026-04-20 09:01:00", "label": "DGO start"},
     {"timestamp": "2026-04-20 17:30:00", "label": "CD start"}
   ],
+  "0421": [
+    {"timestamp": "2026-04-20 08:30:00", "label": "DGO start"},
+    {"timestamp": "2026-04-20 14:30:00", "label": "Oil off"},
+    {"timestamp": "2026-04-20 17:02:00", "label": "CD start"}
+  ],
   "0423": [
     {"timestamp": "2026-04-23 08:43:00", "label": "DGO start"},
     {"timestamp": "2026-04-23 11:48:00", "label": "24, 90/30/270"},
