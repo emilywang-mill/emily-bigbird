@@ -51,7 +51,7 @@ header .status .dot { width:6px; height:6px; border-radius:50%; background:var(-
 .panel { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:10px 14px; }
 .panel-label { font-size:9px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--muted2); margin-bottom:8px; }
 .run-pills { display:flex; flex-wrap:wrap; gap:4px; }
-.pill { padding:3px 8px; border-radius:3px; border:1px solid transparent; font-family:var(--mono); font-size:11px; cursor:pointer; transition:all .1s; background:transparent; color:var(--muted2); opacity:.45; line-height:1.5; }
+.pill { padding:3px 8px; border-radius:3px; border:1px solid var(--border2); font-family:var(--mono); font-size:11px; cursor:pointer; transition:all .1s; background:transparent; color:var(--muted2); opacity:.55; line-height:1.5; }
 .pill.on { opacity:1; background:rgba(0,0,0,.04); }
 .pill:hover { opacity:.75; }
 
@@ -416,7 +416,6 @@ let RUN_EVENTS = {
 // STATE
 // ══════════════════════════════════════════════════════════
 let RUNS={}, datasets={}, activeRuns=new Set();
-let _colorIdx=0; // increments each time a run is activated — ensures no color repeats
 let winMin=10, viewMode='smooth', showEvents=false, showTooltip=true;
 let xMode='time';    // 'time' | 'mass'
 let alignMode='ramp'; // 'oil' | 'ramp'
@@ -795,6 +794,14 @@ function getVals(runName,m){
 }
 
 // ══════════════════════════════════════════════════════════
+// RUN COLOR — positional: 1st active run = color[0], 2nd = color[1], etc.
+// This means the legend/chart order always matches the palette order.
+function getRunColor(name){
+  const idx=[...activeRuns].indexOf(name);
+  return idx>=0 ? RUN_COLORS[idx%RUN_COLORS.length] : '#888';
+}
+
+// ══════════════════════════════════════════════════════════
 // PILLS
 // ══════════════════════════════════════════════════════════
 // ── Run filters ──────────────────────────────────────────────────────────────
@@ -850,11 +857,14 @@ function clearRunFilters(){
 
 function renderPills(){
   const el=document.getElementById('pills'); el.innerHTML='';
+  // Sync RUNS color to current positional color for each active run
+  [...activeRuns].forEach(n=>{ if(RUNS[n]) RUNS[n].color=getRunColor(n); });
   for(const[name,meta]of Object.entries(RUNS)){
     const btn=document.createElement('button');
     btn.className='pill'+(activeRuns.has(name)?' on':'');
     btn.id='pill-'+name; btn.dataset.run=name; btn.textContent=name;
-    btn.style.cssText=`border-color:${meta.color};color:${meta.color};`;
+    const pColor=activeRuns.has(name)?getRunColor(name):'var(--border2)';
+    btn.style.cssText=`border-color:${pColor};color:${activeRuns.has(name)?pColor:'var(--muted2)'};`;
     btn.onclick=()=>toggleRun(name);
     el.appendChild(btn);
   }
@@ -863,8 +873,6 @@ async function toggleRun(name){
   const pill=document.getElementById('pill-'+name);
   if(activeRuns.has(name)){activeRuns.delete(name);pill.classList.remove('on');}
   else{
-    // Assign color by activation order — guarantees no repeats regardless of run ID
-    if(!RUNS[name].color) RUNS[name].color=RUN_COLORS[_colorIdx++%RUN_COLORS.length];
     activeRuns.add(name);
     if(!datasets[name]){
       const orig=pill.textContent; pill.textContent=name+' …';
@@ -1546,16 +1554,9 @@ document.getElementById('modalOverlay').addEventListener('click',e=>{
 async function init(){
   document.getElementById('statusText').textContent='discovering runs…';
   await discoverRuns();
-  const defs=['0422','0423','0427','0505'];
-  defs.forEach(n=>{if(RUNS[n]) activeRuns.add(n);});
-  if(!activeRuns.size) Object.keys(RUNS).slice(0,2).forEach(n=>activeRuns.add(n));
   renderPills();
   document.getElementById('initLoading').remove();
   renderAllPlots(); renderChipStrip(); renderRunStats();
-  document.getElementById('statusText').textContent='loading data…';
-  [...activeRuns].forEach(n=>{ if(RUNS[n]&&!RUNS[n].color) RUNS[n].color=RUN_COLORS[_colorIdx++%RUN_COLORS.length]; });
-  await Promise.all([...activeRuns].map(n=>loadRun(n).catch(()=>activeRuns.delete(n))));
-  rebuildAll(); renderChipStrip();
   document.getElementById('statusText').textContent=`${Object.keys(RUNS).length} runs · ${Object.keys(datasets).length} loaded`;
 }
 init();
